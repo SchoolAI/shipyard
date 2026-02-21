@@ -1,3 +1,5 @@
+import { AUTOFOCUS_DELAY_MS } from '../hooks/use-delayed-autofocus';
+
 export type HotkeyContext = 'global' | 'navigation' | 'composer';
 
 export interface HotkeyDef {
@@ -7,6 +9,8 @@ export interface HotkeyDef {
   description: string;
   context: HotkeyContext;
 }
+
+const autofocusDelay = `${AUTOFOCUS_DELAY_MS / 1000}s`;
 
 export const HOTKEYS = {
   toggleSidebar: {
@@ -62,14 +66,14 @@ export const HOTKEYS = {
     key: 'j',
     label: 'Next Task',
     display: 'J',
-    description: 'Navigate to next task',
+    description: `Navigate to next task (composer focuses after ${autofocusDelay})`,
     context: 'navigation',
   },
   navigatePrev: {
     key: 'k',
     label: 'Previous Task',
     display: 'K',
-    description: 'Navigate to previous task',
+    description: `Navigate to previous task (composer focuses after ${autofocusDelay})`,
     context: 'navigation',
   },
   focusComposer: {
@@ -121,4 +125,4 @@ export const HOTKEYS = {
     description: 'Enhance the current prompt with AI',
     context: 'composer',
   },
-} as const satisfies Record<string, HotkeyDef>;
+} satisfies Record<string, HotkeyDef>;

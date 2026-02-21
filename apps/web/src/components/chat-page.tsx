@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useCreateWorktree } from '../hooks/use-create-worktree';
+import { useDelayedAutofocus } from '../hooks/use-delayed-autofocus';
 import { useEnhancePrompt } from '../hooks/use-enhance-prompt';
 import type { GitRepoInfo } from '../hooks/use-machine-selection';
 import { useMachineSelection } from '../hooks/use-machine-selection';
@@ -630,13 +631,24 @@ export function ChatPage() {
     }
   }, [activeTaskId, plans.length]);
 
+  const delayedFocus = useDelayedAutofocus(composerRef);
+  const isKeyboardNavRef = useRef(false);
+
   useEffect(() => {
-    if (!isTerminalOpen) {
-      requestAnimationFrame(() => {
-        composerRef.current?.focus();
-      });
+    if (isKeyboardNavRef.current) {
+      isKeyboardNavRef.current = false;
+      if (!isTerminalOpen) {
+        delayedFocus.schedule();
+      }
+    } else {
+      delayedFocus.cancel();
+      if (!isTerminalOpen) {
+        requestAnimationFrame(() => {
+          composerRef.current?.focus();
+        });
+      }
     }
-  }, [activeTaskId, isTerminalOpen]);
+  }, [activeTaskId, isTerminalOpen, delayedFocus]);
 
   const handleNewTask = useCallback(() => {
     setActiveTask(null);
@@ -647,6 +659,7 @@ export function ChatPage() {
     const nextIndex = currentIndex + 1;
     const next = taskList[nextIndex];
     if (next) {
+      isKeyboardNavRef.current = true;
       setActiveTask(next.taskId);
     }
   }, [taskList, activeTaskId, setActiveTask]);
@@ -656,6 +669,7 @@ export function ChatPage() {
     const prevIndex = currentIndex - 1;
     const prev = taskList[prevIndex];
     if (prev) {
+      isKeyboardNavRef.current = true;
       setActiveTask(prev.taskId);
     }
   }, [taskList, activeTaskId, setActiveTask]);
