@@ -616,6 +616,20 @@ export function ChatPage() {
     }
   }, [activeSidePanel, setSidebarExpanded]);
 
+  const planAutoOpenedForTaskRef = useRef<string | null>(null);
+  const sawEmptyPlansForTaskRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (plans.length === 0) {
+      sawEmptyPlansForTaskRef.current = activeTaskId;
+    } else if (
+      sawEmptyPlansForTaskRef.current === activeTaskId &&
+      planAutoOpenedForTaskRef.current !== activeTaskId
+    ) {
+      planAutoOpenedForTaskRef.current = activeTaskId;
+      useUIStore.getState().setActiveSidePanel('plan');
+    }
+  }, [activeTaskId, plans.length]);
+
   useEffect(() => {
     if (!isTerminalOpen) {
       requestAnimationFrame(() => {
