@@ -19,7 +19,7 @@ export default defineConfig({
     'zod',
     'nanoid',
   ],
-  external: ['node-pty', 'node-datachannel', 'loro-crdt', 'pino', '@anthropic-ai/claude-agent-sdk'],
+  external: ['node-pty', 'node-datachannel', 'loro-crdt', 'pino', 'pino-roll', '@anthropic-ai/claude-agent-sdk'],
   banner: {
     js: '#!/usr/bin/env node',
   },
