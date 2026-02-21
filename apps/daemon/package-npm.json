@@ -19,8 +19,7 @@
     "loro-crdt": "^1.10.3",
     "node-datachannel": "^0.32.1",
     "node-pty": "^1.0.0",
-    "pino": "^9.6.0",
-    "zod": "^4.3.5"
+    "pino": "^9.6.0"
   },
   "optionalDependencies": {
     "pino-pretty": "^13.0.0"
