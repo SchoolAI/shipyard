@@ -1,6 +1,6 @@
 {
   "name": "@schoolai/shipyard",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Shipyard daemon - Claude Agent SDK + Loro CRDT sync",
   "type": "module",
   "main": "./dist/index.js",

@@ -201,25 +201,34 @@ jobs:
           # Publish as latest
           npm publish --tag latest --access public
 
-      - name: Tag stable release and bump for next cycle (promote)
+      - name: Tag stable release (promote)
         if: steps.release.outputs.type == 'promote'
         env:
-          STABLE_VERSION: ${{ steps.promote.outputs.stable_version }}
           TAG: ${{ steps.promote.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Tag the stable release
           git tag "${TAG}"
           git push origin "${TAG}"
 
-          # Bump base version minor for next release cycle
-          cd apps/daemon
+      - name: Bump base version for next cycle (promote)
+        if: steps.release.outputs.type == 'promote'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STABLE_VERSION: ${{ steps.promote.outputs.stable_version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           NEXT_VERSION=$(node -e "
             const [major, minor, patch] = process.env.STABLE_VERSION.split('.').map(Number);
             console.log(major + '.' + (minor + 1) + '.0');
           ")
+
+          BRANCH="chore/bump-npm-version-to-${NEXT_VERSION}"
+          git checkout -b "${BRANCH}"
+
+          cd apps/daemon
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package-npm.json', 'utf8'));
@@ -230,7 +239,13 @@ jobs:
 
           git add apps/daemon/package-npm.json
           git commit -m "chore: bump base version to ${NEXT_VERSION} for next release cycle"
-          git push origin HEAD
+          git push origin "${BRANCH}"
+
+          gh pr create \
+            --title "chore: bump npm base version to ${NEXT_VERSION}" \
+            --body "Auto-generated after promoting v${STABLE_VERSION} to stable. Bumps base version for next release cycle." \
+            --base main \
+            --head "${BRANCH}"
 
       - name: GitHub release (promote)
         if: steps.release.outputs.type == 'promote'
