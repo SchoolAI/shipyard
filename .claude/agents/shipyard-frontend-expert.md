@@ -10,6 +10,7 @@ skills:
   - loro-expert
   - shipyard-zustand-expert
   - shipyard-engineering-standards
+  - ui-mockup
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
 memory: project
