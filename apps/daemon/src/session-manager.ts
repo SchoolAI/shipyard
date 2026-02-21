@@ -753,8 +753,15 @@ export class SessionManager {
         });
       });
 
-      // eslint-disable-next-line no-restricted-syntax -- loro() returns branded LoroTypedDocRef; runtime-identical to LoroDoc
-      initPlanEditorDoc(loro(this.#taskDoc) as unknown as LoroDoc, planId, planMarkdown);
+      // eslint-disable-next-line no-restricted-syntax -- extract raw LoroDoc from branded TypedDocRef wrapper
+      const loroDoc = (loro(this.#taskDoc) as unknown as { doc: LoroDoc }).doc;
+      const initOk = initPlanEditorDoc(loroDoc, planId, planMarkdown);
+      if (!initOk) {
+        logger.warn(
+          { planId, toolUseId: block.toolUseId },
+          'Failed to initialize plan editor doc from markdown'
+        );
+      }
 
       logger.info(
         { toolUseId: block.toolUseId, planId },

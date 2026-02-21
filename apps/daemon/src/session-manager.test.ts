@@ -1,8 +1,10 @@
 import type { Query } from '@anthropic-ai/claude-agent-sdk';
 import type { TypedDoc } from '@loro-extended/change';
-import { createTypedDoc } from '@loro-extended/change';
+import { createTypedDoc, loro } from '@loro-extended/change';
 import type { TaskDocumentShape } from '@shipyard/loro-schema';
 import { generateTaskId, TaskDocumentSchema } from '@shipyard/loro-schema';
+import type { LoroDoc } from 'loro-crdt';
+import { isContainer } from 'loro-crdt';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManager } from './session-manager.js';
 
@@ -1971,6 +1973,81 @@ describe('SessionManager', () => {
       ctrl.emit(successResult());
       ctrl.end();
       await sessionPromise;
+    });
+  });
+
+  describe('plan extraction', () => {
+    function assistantMsgWithExitPlanMode(planMarkdown: string) {
+      return {
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'exit-plan-1',
+              name: 'ExitPlanMode',
+              input: { plan: planMarkdown },
+            },
+          ],
+        },
+        parent_tool_use_id: null,
+        uuid: '00000000-0000-0000-0000-000000000030',
+        session_id: 'sess-1',
+      };
+    }
+
+    it('ExitPlanMode creates plan AND planEditorDocs entry', async () => {
+      const planMd = '# My Plan\n\n- Step 1\n- Step 2';
+
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-plan'),
+          assistantMsgWithExitPlanMode(planMd),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Make a plan', cwd: '/tmp' });
+
+      const json = taskDoc.toJSON();
+      expect(json.plans).toHaveLength(1);
+      expect(json.plans[0]?.markdown).toBe(planMd);
+      expect(json.plans[0]?.reviewStatus).toBe('pending');
+
+      const planId = json.plans[0]!.planId;
+
+      // eslint-disable-next-line no-restricted-syntax -- accessing raw LoroDoc from typed wrapper
+      const loroDoc = (loro(taskDoc) as unknown as { doc: LoroDoc }).doc;
+      const planEditorDocsMap = loroDoc.getMap('planEditorDocs');
+      const container = planEditorDocsMap.get(planId);
+      expect(isContainer(container)).toBe(true);
+    });
+
+    it('does not duplicate plans on replay', async () => {
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-plan-1'),
+          assistantMsgWithExitPlanMode('# Plan A'),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Plan', cwd: '/tmp' });
+
+      taskDoc.meta.status = 'submitted';
+
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-plan-2'),
+          assistantMsgWithExitPlanMode('# Plan A'),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Plan again', cwd: '/tmp' });
+
+      const json = taskDoc.toJSON();
+      expect(json.plans).toHaveLength(1);
     });
   });
 

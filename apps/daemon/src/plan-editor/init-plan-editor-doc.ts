@@ -5,6 +5,7 @@ import type { LoroDoc } from 'loro-crdt';
 import { LoroMap } from 'loro-crdt';
 import type { LoroDocType, LoroNodeMapping } from 'loro-prosemirror';
 import { updateLoroToPmState } from 'loro-prosemirror';
+import { logger } from '../logger.js';
 import { configurePlanEditorTextStyles, planEditorParser, planEditorSchema } from './schema.js';
 
 /**
@@ -29,8 +30,10 @@ function initPlanEditorDoc(loroDoc: LoroDoc, planId: string, markdown: string): 
 
     // eslint-disable-next-line no-restricted-syntax -- loro-prosemirror requires LoroDocType which is structurally identical to LoroDoc but nominally distinct
     updateLoroToPmState(loroDoc as unknown as LoroDocType, mapping, editorState, planContainer.id);
+    loroDoc.commit();
     return true;
-  } catch {
+  } catch (error) {
+    logger.warn({ planId, error }, 'initPlanEditorDoc failed');
     return false;
   }
 }
