@@ -36,6 +36,7 @@ export interface ChatMessageData {
   role: MessageRole;
   content: ContentBlock[];
   isThinking?: boolean;
+  isQueued?: boolean;
   agentName?: string;
 }
 
@@ -844,9 +845,15 @@ function UserMessage({ message }: ChatMessageProps) {
   const imageOnly = !textContent && imageBlocks.length > 0;
 
   return (
-    <div className="flex justify-end max-w-3xl ml-auto">
+    <div className={`flex justify-end max-w-3xl ml-auto ${message.isQueued ? 'opacity-50' : ''}`}>
       <div className={`bg-default rounded-2xl max-w-[80%] ${imageOnly ? 'p-1.5' : 'px-4 py-2.5'}`}>
-        <span className="sr-only">You:</span>
+        <span className="sr-only">{message.isQueued ? 'Queued message:' : 'You:'}</span>
+        {message.isQueued && (
+          <div className="flex items-center gap-1.5 mb-1 text-xs text-muted">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-warning" aria-hidden="true" />
+            Queued
+          </div>
+        )}
         {imageBlocks.length > 0 && (
           <div className={textContent ? 'mb-2' : ''}>
             <UserImageGrid imageBlocks={imageBlocks} />

@@ -45,6 +45,7 @@ export interface LastUserConfig {
 export interface TaskDocumentResult {
   meta: TaskMeta | null;
   conversation: Message[];
+  pendingFollowUps: Message[];
   sessions: SessionEntry[];
   plans: PlanVersion[];
   diffState: DiffState | null;
@@ -106,6 +107,10 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
 
   const meta = useDoc(handle, (d: { meta: TaskMeta }) => d.meta);
   const conversation = useDoc(handle, (d: { conversation: Message[] }) => d.conversation);
+  const pendingFollowUps = useDoc(
+    handle,
+    (d: { pendingFollowUps: Message[] }) => d.pendingFollowUps
+  );
   const sessions = useDoc(handle, (d: { sessions: SessionEntry[] }) => d.sessions);
   const plans = useDoc(handle, (d: { plans: PlanVersion[] }) => d.plans);
   const diffState = useDoc(handle, (d: { diffState: DiffState }) => d.diffState);
@@ -314,6 +319,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     return {
       meta: null,
       conversation: [],
+      pendingFollowUps: [],
       sessions: [],
       plans: [],
       diffState: null,
@@ -335,6 +341,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   return {
     meta,
     conversation,
+    pendingFollowUps,
     sessions,
     plans,
     diffState,
