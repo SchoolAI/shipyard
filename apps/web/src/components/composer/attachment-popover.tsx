@@ -18,7 +18,7 @@ export function AttachmentPopover({ onFilesSelected }: AttachmentPopoverProps) {
           variant="ghost"
           size="sm"
           aria-label="Add attachment"
-          className="rounded-full text-muted hover:text-foreground hover:bg-default w-9 h-9 sm:w-7 sm:h-7 min-w-0"
+          className="rounded-full text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
         >
           <Plus className="w-4 h-4" />
         </Button>

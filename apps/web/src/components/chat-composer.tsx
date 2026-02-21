@@ -545,36 +545,33 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <PermissionModePicker mode={permissionMode} onModeChange={onPermissionChange} />
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {/** Voice input -- hidden on mobile and when unsupported */}
+          <div className="flex items-center gap-2 sm:gap-1 shrink-0">
             {isVoiceSupported === true && onVoiceToggle && (
-              <div className="hidden sm:flex">
-                <Tooltip>
-                  <Tooltip.Trigger>
-                    <Button
-                      isIconOnly
-                      variant="ghost"
-                      size="sm"
-                      aria-label={isVoiceRecording ? 'Stop voice input' : 'Start voice input'}
-                      aria-keyshortcuts="Meta+Alt+M"
-                      className={`rounded-full w-8 h-8 min-w-0 ${
-                        isVoiceRecording
-                          ? 'bg-danger text-danger-foreground motion-safe:animate-pulse'
-                          : 'text-muted hover:text-foreground hover:bg-default'
-                      }`}
-                      onPress={onVoiceToggle}
-                    >
-                      <Mic className="w-4 h-4" />
-                    </Button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content>
-                    <span className="flex items-center gap-2">
-                      {isVoiceRecording ? 'Stop recording' : 'Voice input'}
-                      <Kbd>{HOTKEYS.voiceInput.display}</Kbd>
-                    </span>
-                  </Tooltip.Content>
-                </Tooltip>
-              </div>
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    variant="ghost"
+                    size="sm"
+                    aria-label={isVoiceRecording ? 'Stop voice input' : 'Start voice input'}
+                    aria-keyshortcuts="Meta+Alt+M"
+                    className={`rounded-full w-11 h-11 sm:w-8 sm:h-8 min-w-0 ${
+                      isVoiceRecording
+                        ? 'bg-danger text-danger-foreground motion-safe:animate-pulse'
+                        : 'text-muted hover:text-foreground hover:bg-default'
+                    }`}
+                    onPress={onVoiceToggle}
+                  >
+                    <Mic className="w-4 h-4" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <span className="flex items-center gap-2">
+                    {isVoiceRecording ? 'Stop recording' : 'Voice input'}
+                    <Kbd className="hidden sm:inline">{HOTKEYS.voiceInput.display}</Kbd>
+                  </span>
+                </Tooltip.Content>
+              </Tooltip>
             )}
             {onEnhance && (
               <Tooltip>
@@ -586,7 +583,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                     aria-label={enhanceLabel}
                     aria-keyshortcuts="Meta+Shift+E"
                     isDisabled={isEmpty || (isSubmitDisabled && !isEnhancing)}
-                    className={`rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 ${enhanceClassName}`}
+                    className={`rounded-full w-11 h-11 sm:w-8 sm:h-8 min-w-0 ${enhanceClassName}`}
                     onPress={onEnhance}
                   >
                     <Sparkles className="w-4 h-4" />
@@ -595,14 +592,14 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 <Tooltip.Content>
                   <span className="flex items-center gap-2">
                     {enhanceLabel}
-                    <Kbd>{HOTKEYS.enhancePrompt.display}</Kbd>
+                    <Kbd className="hidden sm:inline">{HOTKEYS.enhancePrompt.display}</Kbd>
                   </span>
                 </Tooltip.Content>
               </Tooltip>
             )}
             {showSplitButton ? (
               <div
-                className="inline-flex items-center h-9 sm:h-8 rounded-full bg-accent overflow-hidden"
+                className="inline-flex items-center h-11 sm:h-8 rounded-full bg-accent overflow-hidden"
                 role="group"
                 aria-label="Send options"
               >
@@ -610,7 +607,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                   isIconOnly
                   onPress={handleSubmit}
                   aria-label="Send and queue message"
-                  className="rounded-none rounded-l-full bg-accent text-accent-foreground hover:brightness-110 active:opacity-70 w-9 sm:w-8 h-full min-w-0 border-none"
+                  className="rounded-none rounded-l-full bg-accent text-accent-foreground hover:brightness-110 active:opacity-70 w-11 sm:w-8 h-full min-w-0 border-none"
                 >
                   <ArrowUp className="w-4 h-4" />
                 </Button>
@@ -619,7 +616,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                   <Button
                     isIconOnly
                     aria-label="More send options"
-                    className="rounded-none rounded-r-full bg-accent text-accent-foreground hover:brightness-110 w-6 h-full min-w-0 border-none"
+                    className="rounded-none rounded-r-full bg-accent text-accent-foreground hover:brightness-110 w-9 sm:w-6 h-full min-w-0 border-none"
                   >
                     <ChevronDown className="w-3 h-3" />
                   </Button>
@@ -659,7 +656,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                       size="sm"
                       aria-label="Send message"
                       isDisabled={isEmpty || isSubmitDisabled}
-                      className="rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
+                      className="rounded-full w-11 h-11 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
                       onPress={handleSubmit}
                     >
                       <ArrowUp className="w-4 h-4" />
