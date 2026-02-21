@@ -77,14 +77,21 @@ jobs:
             exit 0
           fi
           echo "Comparing against ${LAST_TAG}"
-          # Exclude package-npm.json: version-bump-only changes shouldn't trigger publishes.
-          # Trade-off: also masks rare dep changes in that file, acceptable for now.
+          # Exclude package-npm.json from the name-only diff to avoid triggering on
+          # version-bump-only changes (the promote step bumps the version field after
+          # each stable release). We check it separately below for real dep changes.
           CHANGED=$(git diff --name-only "${LAST_TAG}"..HEAD -- \
             apps/daemon/ \
             packages/loro-schema/ \
             packages/session/ \
             ':!apps/daemon/package-npm.json' \
           )
+          # Also trigger if package-npm.json changed in any way other than the version field.
+          PKG_JSON_NONTRIVIAL=$(git diff "${LAST_TAG}"..HEAD -- apps/daemon/package-npm.json \
+            | grep '^[+-]' | grep -v '^[+-][+-][+-]' | grep -v '"version"' || true)
+          if [ -n "${PKG_JSON_NONTRIVIAL}" ]; then
+            CHANGED="${CHANGED}"$'\n'"apps/daemon/package-npm.json (non-version change)"
+          fi
           if [ -z "${CHANGED}" ]; then
             echo "No changes since ${LAST_TAG}, skipping publish"
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
