@@ -451,6 +451,7 @@ function ChatPageInner() {
     return map;
   }, [availableModels]);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: message building has inherent branching for Loro vs store, thinking indicators, and queued messages
   const messages: ChatMessageData[] = useMemo(() => {
     /** Convert a raw model ID like "claude-opus-4-6" to a display label. */
     function resolveModelLabel(modelId: string | null | undefined): string | undefined {
@@ -488,6 +489,15 @@ function ChatPageInner() {
           content: [],
           isThinking: true,
           agentName: resolveModelLabel(lastSubmittedModelRef.current),
+        });
+      }
+
+      for (const pending of loroTask.pendingFollowUps) {
+        raw.push({
+          id: `queued-${pending.messageId}`,
+          role: pending.role,
+          content: pending.content,
+          isQueued: true,
         });
       }
     } else {
@@ -1051,6 +1061,7 @@ function ChatPageInner() {
         const now = Date.now();
         const isNewTask = handle.loroDoc.opCount() === 0;
 
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: CRDT write handles new task init, status, content blocks, images, and queue routing
         change(handle.doc, (draft) => {
           if (isNewTask) {
             draft.meta.id = currentTaskId;
@@ -1072,9 +1083,9 @@ function ChatPageInner() {
             });
           }
 
-          draft.conversation.push({
+          const userMessage = {
             messageId: crypto.randomUUID(),
-            role: 'user',
+            role: 'user' as const,
             content: contentBlocks,
             timestamp: now,
             model: model || null,
@@ -1082,7 +1093,13 @@ function ChatPageInner() {
             reasoningEffort,
             permissionMode,
             cwd: selectedEnvironmentPath ?? homeDir ?? null,
-          });
+          };
+
+          if (isAgentRunningRef.current) {
+            draft.pendingFollowUps.push(userMessage);
+          } else {
+            draft.conversation.push(userMessage);
+          }
         });
 
         if (isNewTask) {

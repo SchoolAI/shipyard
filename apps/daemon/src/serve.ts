@@ -1708,35 +1708,51 @@ async function watchTaskDocument(
   }
 }
 
-function handleFollowUp(
+function promotePendingFollowUps(
+  taskHandle: TaskHandle,
   activeTask: ActiveTask | undefined,
-  conversationLen: number,
   taskLog: ReturnType<typeof createChildLogger>
 ): void {
   if (!activeTask) return;
   if (activeTask.abortController.signal.aborted) {
-    taskLog.debug('Task is being aborted, skipping follow-up');
-    return;
-  }
-  if (conversationLen <= activeTask.lastDispatchedConvLen) {
-    taskLog.debug(
-      { conversationLen, lastDispatched: activeTask.lastDispatchedConvLen },
-      'Conversation unchanged since last dispatch, skipping duplicate'
-    );
+    taskLog.debug('Task is being aborted, skipping pending follow-up promotion');
     return;
   }
   if (!activeTask.sessionManager.isStreaming) {
-    taskLog.debug('Task already running but not streaming, skipping');
+    taskLog.debug('Task not streaming, skipping pending follow-up promotion');
     return;
   }
-  const contentBlocks = activeTask.sessionManager.getLatestUserContentBlocks();
-  if (contentBlocks && contentBlocks.length > 0) {
-    try {
-      taskLog.info('Sending follow-up to active streaming session');
-      activeTask.lastDispatchedConvLen = conversationLen;
-      activeTask.sessionManager.sendFollowUp(contentBlocks);
-    } catch (err: unknown) {
-      taskLog.warn({ err }, 'Failed to send follow-up to streaming session');
+
+  const json = taskHandle.doc.toJSON();
+  const pending = json.pendingFollowUps ?? [];
+  if (pending.length === 0) return;
+
+  change(taskHandle.doc, (draft) => {
+    const items = draft.pendingFollowUps.toArray();
+    for (const msg of items) {
+      draft.conversation.push(msg);
+    }
+    if (draft.pendingFollowUps.length > 0) {
+      draft.pendingFollowUps.delete(0, draft.pendingFollowUps.length);
+    }
+  });
+
+  const latestPending = pending[pending.length - 1];
+  if (latestPending) {
+    const contentBlocks = latestPending.content.filter(
+      (block: { type: string }) => block.type === 'text' || block.type === 'image'
+    );
+    if (contentBlocks.length > 0) {
+      try {
+        taskLog.info(
+          { pendingCount: pending.length },
+          'Promoted pending follow-ups to conversation'
+        );
+        activeTask.lastDispatchedConvLen = json.conversation.length + pending.length;
+        activeTask.sessionManager.sendFollowUp(contentBlocks);
+      } catch (err: unknown) {
+        taskLog.warn({ err }, 'Failed to send promoted follow-up');
+      }
     }
   }
 }
@@ -1765,12 +1781,12 @@ function onTaskDocChanged(
   );
 
   if (ctx.activeTasks.has(taskId)) {
-    const conversation = json.conversation;
-    const lastMessage = conversation[conversation.length - 1];
-    if (lastMessage?.role === 'user') {
-      handleFollowUp(ctx.activeTasks.get(taskId), conversation.length, taskLog);
+    const pendingFollowUps = json.pendingFollowUps ?? [];
+    if (pendingFollowUps.length > 0) {
+      promotePendingFollowUps(taskHandle, ctx.activeTasks.get(taskId), taskLog);
     }
 
+    const conversation = json.conversation;
     const activeLastUserMsg = [...conversation].reverse().find((m) => m.role === 'user');
     const activeCwd = activeLastUserMsg?.cwd ?? process.cwd();
     debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
@@ -1778,7 +1794,25 @@ function onTaskDocChanged(
     return;
   }
 
-  const conversation = json.conversation;
+  const pendingFollowUps = json.pendingFollowUps ?? [];
+  if (pendingFollowUps.length > 0) {
+    taskLog.info(
+      { pendingCount: pendingFollowUps.length },
+      'Promoting orphaned pending follow-ups'
+    );
+    change(taskHandle.doc, (draft) => {
+      const items = draft.pendingFollowUps.toArray();
+      for (const msg of items) {
+        draft.conversation.push(msg);
+      }
+      if (draft.pendingFollowUps.length > 0) {
+        draft.pendingFollowUps.delete(0, draft.pendingFollowUps.length);
+      }
+    });
+  }
+
+  const freshJson = taskHandle.doc.toJSON();
+  const conversation = freshJson.conversation;
   if (conversation.length === 0) {
     taskLog.debug('No conversation messages, skipping');
     return;

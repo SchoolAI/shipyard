@@ -207,6 +207,8 @@ export const TaskDocumentSchema = Shape.doc({
 
   conversation: Shape.list(MessageShape),
 
+  pendingFollowUps: Shape.list(MessageShape),
+
   sessions: Shape.list(SessionEntryShape),
 
   diffState: DiffStateShape,
