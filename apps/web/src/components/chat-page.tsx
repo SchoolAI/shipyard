@@ -281,6 +281,14 @@ export function ChatPage() {
   const { agents, connectionState, connection, lastTaskAck } = usePersonalRoom(personalRoomConfig);
   const roomHandle = useRoomHandle(LOCAL_USER_ID);
   const capabilitiesByMachine = useRoomCapabilities(LOCAL_USER_ID);
+
+  const loroTask = useTaskDocument(activeTaskId);
+  const { pendingPermissions, respondToPermission, plans } = loroTask;
+  const taskHasUserMessage = useMemo(
+    () => !!activeTaskId && loroTask.conversation.some((m) => m.role === 'user'),
+    [activeTaskId, loroTask.conversation]
+  );
+
   const {
     machines,
     selectedMachineId,
@@ -289,7 +297,7 @@ export function ChatPage() {
     availableEnvironments,
     homeDir,
     capabilitiesByMachine: capsByMachine,
-  } = useMachineSelection(agents, capabilitiesByMachine);
+  } = useMachineSelection(agents, capabilitiesByMachine, taskHasUserMessage);
 
   const repo = useRepo();
   const webrtcAdapter = useWebRtcAdapter();
@@ -302,9 +310,6 @@ export function ChatPage() {
   const diffLastViewedAt = useUIStore((s) => s.diffLastViewedAt);
   const setDiffLastViewedAt = useUIStore((s) => s.setDiffLastViewedAt);
   const diffScope = useUIStore((s) => s.diffScope);
-
-  const loroTask = useTaskDocument(activeTaskId);
-  const { pendingPermissions, respondToPermission, plans } = loroTask;
 
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const taskList = useMemo(
@@ -569,13 +574,20 @@ export function ChatPage() {
   }, [availableModels, composerModel]);
 
   useEffect(() => {
+    if (taskHasUserMessage) return;
     if (!homeDir) {
       const firstEnv = availableEnvironments[0]?.path ?? null;
       setSelectedEnvironmentPath(firstEnv);
     } else {
       setSelectedEnvironmentPath(null);
     }
-  }, [selectedMachineId, availableEnvironments, homeDir, setSelectedEnvironmentPath]);
+  }, [
+    selectedMachineId,
+    availableEnvironments,
+    homeDir,
+    setSelectedEnvironmentPath,
+    taskHasUserMessage,
+  ]);
 
   useEffect(() => {
     return () => clearTimeout(demoTimerRef.current);
@@ -1173,7 +1185,7 @@ export function ChatPage() {
                         setupStatus={worktreeProgress.setupStatus}
                         setupExitCode={worktreeProgress.setupExitCode}
                         onSwitchToWorktree={
-                          worktreeProgress.worktreePath
+                          worktreeProgress.worktreePath && !taskHasUserMessage
                             ? () => {
                                 const wtPath = worktreeProgress.worktreePath;
                                 setSelectedEnvironmentPath(wtPath ?? null);
@@ -1226,6 +1238,7 @@ export function ChatPage() {
                     isEnhancing={isEnhancing}
                     onEnhance={handleEnhance}
                     onCreateWorktree={handleOpenWorktreeModal}
+                    isEnvironmentLocked={taskHasUserMessage}
                   />
                   <StatusBar
                     connectionState={connectionState}
@@ -1237,6 +1250,8 @@ export function ChatPage() {
                     onEnvironmentSelect={setSelectedEnvironmentPath}
                     homeDir={homeDir}
                     onCreateWorktree={handleOpenWorktreeModalWithSource}
+                    isMachineLocked={taskHasUserMessage}
+                    isEnvironmentLocked={taskHasUserMessage}
                   />
                 </div>
               </>

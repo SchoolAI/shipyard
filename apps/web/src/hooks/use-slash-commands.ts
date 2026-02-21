@@ -169,18 +169,23 @@ interface UseSlashCommandsOptions {
   onExecute: (action: SlashCommandAction) => void;
   onClearInput: () => void;
   environments?: GitRepoInfo[];
+  isEnvironmentLocked?: boolean;
 }
 
 export function useSlashCommands({
   onExecute,
   onClearInput,
   environments,
+  isEnvironmentLocked,
 }: UseSlashCommandsOptions): SlashCommandState {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const allCommands = useMemo(() => {
+    if (isEnvironmentLocked) {
+      return COMMANDS.filter((cmd) => cmd.action.kind !== 'createWorktree');
+    }
     const envCommands: SlashCommandItem[] = (environments ?? []).map((env) => ({
       id: `env:${env.path}`,
       name: `${env.name} (${env.branch})`,
@@ -191,7 +196,7 @@ export function useSlashCommands({
       parentLabel: 'Environment',
     }));
     return [...COMMANDS, ...envCommands];
-  }, [environments]);
+  }, [environments, isEnvironmentLocked]);
 
   const filteredCommands = useMemo(() => {
     if (!isOpen) return [];

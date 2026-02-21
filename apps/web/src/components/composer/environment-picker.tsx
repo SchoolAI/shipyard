@@ -24,6 +24,7 @@ export interface EnvironmentPickerProps {
   onSelect: (path: string | null) => void;
   homeDir?: string;
   onCreateWorktree?: (sourceRepo: GitRepoInfo) => void;
+  isLocked?: boolean;
 }
 
 interface RepoGroup {
@@ -227,6 +228,7 @@ export function EnvironmentPicker({
   onSelect,
   homeDir,
   onCreateWorktree,
+  isLocked,
 }: EnvironmentPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -300,14 +302,20 @@ export function EnvironmentPicker({
     );
   }
 
+  const lockedTooltip = isLocked ? 'Environment is locked for this task' : tooltipContent;
+
   return (
-    <Popover isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <Tooltip isDisabled={isOpen}>
+    <Popover
+      isOpen={isLocked ? false : isOpen}
+      onOpenChange={isLocked ? () => {} : handleOpenChange}
+    >
+      <Tooltip isDisabled={isOpen && !isLocked}>
         <Popover.Trigger>
           <Tooltip.Trigger>
             <Button
               variant="ghost"
               size="sm"
+              isDisabled={isLocked}
               aria-label={`Environment: ${label}`}
               className={`flex items-center gap-1 transition-colors text-xs ${
                 hasUnselectedEnvironments
@@ -325,7 +333,7 @@ export function EnvironmentPicker({
             </Button>
           </Tooltip.Trigger>
         </Popover.Trigger>
-        <Tooltip.Content>{tooltipContent}</Tooltip.Content>
+        <Tooltip.Content>{lockedTooltip}</Tooltip.Content>
       </Tooltip>
       <Popover.Content placement="top" className="w-auto min-w-[240px] max-w-[340px] p-0">
         <Popover.Dialog>

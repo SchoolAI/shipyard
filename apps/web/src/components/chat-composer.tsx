@@ -47,6 +47,7 @@ interface ChatComposerProps {
   isEnhancing?: boolean;
   onEnhance?: () => void;
   onCreateWorktree?: () => void;
+  isEnvironmentLocked?: boolean;
 }
 
 export interface ChatComposerHandle {
@@ -85,6 +86,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     isEnhancing,
     onEnhance,
     onCreateWorktree,
+    isEnvironmentLocked,
   },
   ref
 ) {
@@ -114,7 +116,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           onReasoningChange(action.level);
           break;
         case 'setEnvironment':
-          onEnvironmentSelect?.(action.path);
+          if (!isEnvironmentLocked) onEnvironmentSelect?.(action.path);
           break;
         case 'clear':
           onClearChat();
@@ -122,7 +124,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         case 'help':
           break;
         case 'createWorktree':
-          onCreateWorktree?.();
+          if (!isEnvironmentLocked) onCreateWorktree?.();
           break;
         default:
           assertNever(action);
@@ -135,6 +137,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
       onClearChat,
       onEnvironmentSelect,
       onCreateWorktree,
+      isEnvironmentLocked,
     ]
   );
 
@@ -186,6 +189,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onExecute: handleSlashExecute,
     onClearInput: handleClearInput,
     environments: availableEnvironments,
+    isEnvironmentLocked,
   });
 
   const adjustHeight = useCallback(() => {

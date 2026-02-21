@@ -33,6 +33,8 @@ export interface StatusBarProps {
   onEnvironmentSelect?: (path: string | null) => void;
   homeDir?: string;
   onCreateWorktree?: (sourceRepo: GitRepoInfo) => void;
+  isMachineLocked?: boolean;
+  isEnvironmentLocked?: boolean;
 }
 
 export function StatusBar({
@@ -45,6 +47,8 @@ export function StatusBar({
   onEnvironmentSelect,
   homeDir,
   onCreateWorktree,
+  isMachineLocked,
+  isEnvironmentLocked,
 }: StatusBarProps) {
   const machineKeys = useMemo(
     () => (selectedMachineId ? new Set([selectedMachineId]) : new Set<string>()),
@@ -68,59 +72,71 @@ export function StatusBar({
       <div className="flex items-center flex-nowrap gap-x-2 gap-y-1 text-xs text-muted sm:gap-x-3 overflow-hidden">
         <div className="flex items-center min-w-0">
           {machines.length > 0 ? (
-            <Dropdown>
+            isMachineLocked ? (
               <Tooltip>
                 <Tooltip.Trigger>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Machines: ${machinesLabel}`}
-                    className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
-                  >
+                  <span className="flex items-center gap-1 text-xs text-muted cursor-default">
                     <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
                     <span className="truncate max-w-[4rem] sm:max-w-[6rem]">{machinesLabel}</span>
-                    <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
-                  </Button>
+                  </span>
                 </Tooltip.Trigger>
-                <Tooltip.Content>{machinesLabel}</Tooltip.Content>
+                <Tooltip.Content>Machine is locked for this task</Tooltip.Content>
               </Tooltip>
-              <Dropdown.Popover placement="top" className="min-w-[200px]">
-                <Dropdown.Menu
-                  selectionMode="single"
-                  selectedKeys={machineKeys}
-                  onSelectionChange={(keys) => {
-                    const selected = [...keys][0];
-                    if (typeof selected === 'string' && onMachineSelect) {
-                      onMachineSelect(selected);
-                    }
-                  }}
-                >
-                  {machines.map((machine) => (
-                    <Dropdown.Item
-                      key={machine.machineId}
-                      id={machine.machineId}
-                      textValue={machine.machineName}
+            ) : (
+              <Dropdown>
+                <Tooltip>
+                  <Tooltip.Trigger>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Machines: ${machinesLabel}`}
+                      className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
                     >
-                      <div className="flex items-center justify-between w-full gap-2">
-                        <Label>{machine.machineName}</Label>
-                        <div className="flex gap-1">
-                          {machine.agents.map((agent) => (
-                            <Chip
-                              key={agent.agentId}
-                              size="sm"
-                              variant="soft"
-                              color={STATUS_COLOR[agent.status]}
-                            >
-                              {agent.status}
-                            </Chip>
-                          ))}
+                      <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
+                      <span className="truncate max-w-[4rem] sm:max-w-[6rem]">{machinesLabel}</span>
+                      <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+                    </Button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>{machinesLabel}</Tooltip.Content>
+                </Tooltip>
+                <Dropdown.Popover placement="top" className="min-w-[200px]">
+                  <Dropdown.Menu
+                    selectionMode="single"
+                    selectedKeys={machineKeys}
+                    onSelectionChange={(keys) => {
+                      const selected = [...keys][0];
+                      if (typeof selected === 'string' && onMachineSelect) {
+                        onMachineSelect(selected);
+                      }
+                    }}
+                  >
+                    {machines.map((machine) => (
+                      <Dropdown.Item
+                        key={machine.machineId}
+                        id={machine.machineId}
+                        textValue={machine.machineName}
+                      >
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <Label>{machine.machineName}</Label>
+                          <div className="flex gap-1">
+                            {machine.agents.map((agent) => (
+                              <Chip
+                                key={agent.agentId}
+                                size="sm"
+                                variant="soft"
+                                color={STATUS_COLOR[agent.status]}
+                              >
+                                {agent.status}
+                              </Chip>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
+                      </Dropdown.Item>
+                    ))}
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
+            )
           ) : (
             <span className="flex items-center gap-1 min-w-0 text-warning">
               <AlertCircle className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -135,6 +151,7 @@ export function StatusBar({
           onSelect={onEnvironmentSelect ?? (() => {})}
           homeDir={homeDir}
           onCreateWorktree={onCreateWorktree}
+          isLocked={isEnvironmentLocked}
         />
 
         {/** Branch -- only shown for real project environments */}

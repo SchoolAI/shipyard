@@ -35,7 +35,8 @@ export interface MachineGroup {
  */
 export function useMachineSelection(
   agents: SignalingAgentInfo[],
-  capabilitiesByMachine: Map<string, MachineCapabilitiesEphemeralValue>
+  capabilitiesByMachine: Map<string, MachineCapabilitiesEphemeralValue>,
+  isLocked?: boolean
 ) {
   const selectedMachineId = useUIStore((s) => s.selectedMachineId);
   const setSelectedMachineId = useUIStore((s) => s.setSelectedMachineId);
@@ -60,7 +61,7 @@ export function useMachineSelection(
 
   const machineStillConnected = machines.some((m) => m.machineId === selectedMachineId);
   const effectiveMachineId =
-    selectedMachineId && machineStillConnected
+    selectedMachineId && (machineStillConnected || isLocked)
       ? selectedMachineId
       : (machines[0]?.machineId ?? null);
   useEffect(() => {
