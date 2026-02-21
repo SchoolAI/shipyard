@@ -232,4 +232,112 @@ describe('usePersonalRoom', () => {
 
     expect(result.current.connection).toBeNull();
   });
+
+  describe('reconnection on visibility/online events', () => {
+    it('reconnects when page becomes visible while disconnected', () => {
+      const { result } = renderHook(() => usePersonalRoom({ url: 'ws://test' }));
+
+      // Go connected, then disconnected
+      act(() => {
+        mockConn._emitStateChange('connected');
+      });
+      act(() => {
+        mockConn._emitStateChange('disconnected');
+      });
+
+      expect(result.current.connectionState).toBe('disconnected');
+
+      // Clear initial connect call
+      mockConn.connect.mockClear();
+
+      // Simulate page becoming visible
+      Object.defineProperty(document, 'hidden', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      // BUG: no visibilitychange handler exists, so connect is NOT called
+      expect(mockConn.connect).toHaveBeenCalled();
+    });
+
+    it('reconnects when browser goes online while disconnected', () => {
+      const { result } = renderHook(() => usePersonalRoom({ url: 'ws://test' }));
+
+      act(() => {
+        mockConn._emitStateChange('connected');
+      });
+      act(() => {
+        mockConn._emitStateChange('disconnected');
+      });
+
+      expect(result.current.connectionState).toBe('disconnected');
+      mockConn.connect.mockClear();
+
+      // Simulate browser going online
+      act(() => {
+        window.dispatchEvent(new Event('online'));
+      });
+
+      // BUG: no online handler exists, so connect is NOT called
+      expect(mockConn.connect).toHaveBeenCalled();
+    });
+
+    it('does not reconnect on visibility change when already connected', () => {
+      renderHook(() => usePersonalRoom({ url: 'ws://test' }));
+
+      act(() => {
+        mockConn._emitStateChange('connected');
+      });
+
+      // Record connect calls so far (1 from mount)
+      const callCountBeforeVisibility = mockConn.connect.mock.calls.length;
+
+      Object.defineProperty(document, 'hidden', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      // Should NOT have called connect again — already connected
+      expect(mockConn.connect).toHaveBeenCalledTimes(callCountBeforeVisibility);
+    });
+
+    it('cleans up visibility and online event listeners on unmount', () => {
+      const docAddSpy = vi.spyOn(document, 'addEventListener');
+      const docRemoveSpy = vi.spyOn(document, 'removeEventListener');
+      const winAddSpy = vi.spyOn(window, 'addEventListener');
+      const winRemoveSpy = vi.spyOn(window, 'removeEventListener');
+
+      const { unmount } = renderHook(() => usePersonalRoom({ url: 'ws://test' }));
+
+      unmount();
+
+      // BUG: no event listeners are registered, so none are removed
+      const docVisibilityAdds = docAddSpy.mock.calls.filter(
+        ([event]) => event === 'visibilitychange'
+      );
+      const docVisibilityRemoves = docRemoveSpy.mock.calls.filter(
+        ([event]) => event === 'visibilitychange'
+      );
+      expect(docVisibilityAdds.length).toBeGreaterThan(0);
+      expect(docVisibilityRemoves.length).toBe(docVisibilityAdds.length);
+
+      const winOnlineAdds = winAddSpy.mock.calls.filter(([event]) => event === 'online');
+      const winOnlineRemoves = winRemoveSpy.mock.calls.filter(([event]) => event === 'online');
+      expect(winOnlineAdds.length).toBeGreaterThan(0);
+      expect(winOnlineRemoves.length).toBe(winOnlineAdds.length);
+
+      docAddSpy.mockRestore();
+      docRemoveSpy.mockRestore();
+      winAddSpy.mockRestore();
+      winRemoveSpy.mockRestore();
+    });
+  });
 });

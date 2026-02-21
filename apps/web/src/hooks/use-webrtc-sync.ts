@@ -1,6 +1,10 @@
 import type { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import type { PeerID } from '@loro-extended/repo';
-import type { PersonalRoomConnection, PersonalRoomServerMessage } from '@shipyard/session';
+import type {
+  ConnectionState,
+  PersonalRoomConnection,
+  PersonalRoomServerMessage,
+} from '@shipyard/session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type PeerState = 'idle' | 'connecting' | 'connected' | 'failed';
@@ -11,8 +15,9 @@ export function useWebRTCSync(options: {
   connection: PersonalRoomConnection | null;
   webrtcAdapter: WebRtcDataChannelAdapter | null;
   targetMachineId: string | null;
+  connectionState: ConnectionState;
 }): { peerState: PeerState; createTerminalChannel: (taskId: string) => RTCDataChannel | null } {
-  const { connection, webrtcAdapter, targetMachineId } = options;
+  const { connection, webrtcAdapter, targetMachineId, connectionState } = options;
   const [peerState, setPeerState] = useState<PeerState>('idle');
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const terminalChannelsRef = useRef(new Map<string, RTCDataChannel>());
@@ -37,6 +42,11 @@ export function useWebRTCSync(options: {
 
   useEffect(() => {
     if (!connection || !webrtcAdapter || !targetMachineId) {
+      setPeerState('idle');
+      return;
+    }
+
+    if (connectionState !== 'connected') {
       setPeerState('idle');
       return;
     }
@@ -153,7 +163,7 @@ export function useWebRTCSync(options: {
       pc.close();
       setPeerState('idle');
     };
-  }, [connection, webrtcAdapter, targetMachineId]);
+  }, [connection, webrtcAdapter, targetMachineId, connectionState]);
 
   return { peerState, createTerminalChannel };
 }

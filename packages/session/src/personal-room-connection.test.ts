@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type ConnectionState,
   PersonalRoomConnection,
@@ -55,6 +55,43 @@ function createConnection(): { connection: PersonalRoomConnection; ws: MockWebSo
   }
 
   return { connection, ws: captured };
+}
+
+function createReconnectableConnection(overrides: Partial<PersonalRoomConnectionConfig> = {}): {
+  connection: PersonalRoomConnection;
+  instances: MockWebSocket[];
+  latestWs: () => MockWebSocket;
+} {
+  const instances: MockWebSocket[] = [];
+
+  const config: PersonalRoomConnectionConfig = {
+    url: 'ws://localhost:8787/personal/user1?token=abc',
+    maxRetries: 3,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    backoffMultiplier: 2,
+    ...overrides,
+    WebSocketImpl: class extends MockWebSocket {
+      constructor(_url: string) {
+        super();
+        instances.push(this);
+      }
+    } as unknown as PersonalRoomConnectionConfig['WebSocketImpl'],
+  };
+
+  const connection = new PersonalRoomConnection(config);
+
+  return {
+    connection,
+    instances,
+    latestWs: () => {
+      const ws = instances[instances.length - 1];
+      if (!ws) {
+        throw new Error('No WebSocket instance created');
+      }
+      return ws;
+    },
+  };
 }
 
 describe('PersonalRoomConnection', () => {
@@ -263,5 +300,242 @@ describe('PersonalRoomConnection', () => {
 
     expect(handler1).toHaveBeenCalledWith('connected');
     expect(handler2).toHaveBeenCalledWith('connected');
+  });
+});
+
+describe('auto-reconnect', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('does not reconnect by default (backwards compat)', () => {
+    const { connection, ws } = createConnection();
+    ws.simulateOpen();
+    ws.simulateClose();
+
+    vi.advanceTimersByTime(60000);
+
+    expect(connection.getState()).toBe('disconnected');
+  });
+
+  it('transitions to reconnecting after close when maxRetries configured', () => {
+    const { connection, instances } = createReconnectableConnection({
+      maxRetries: 3,
+      initialDelayMs: 1000,
+    });
+    connection.connect();
+    const ws = instances[instances.length - 1]!;
+    ws.simulateOpen();
+    ws.simulateClose();
+
+    expect(connection.getState()).toBe('reconnecting');
+  });
+
+  it('reconnects after initial delay', () => {
+    const { connection, instances } = createReconnectableConnection({ initialDelayMs: 1000 });
+    connection.connect();
+    const ws = instances[instances.length - 1]!;
+    ws.simulateOpen();
+
+    const countBefore = instances.length;
+    ws.simulateClose();
+
+    expect(connection.getState()).toBe('reconnecting');
+
+    vi.advanceTimersByTime(1000);
+
+    expect(instances.length).toBe(countBefore + 1);
+    expect(connection.getState()).toBe('connecting');
+  });
+
+  it('uses exponential backoff', () => {
+    const { connection, instances } = createReconnectableConnection({
+      maxRetries: -1,
+      initialDelayMs: 1000,
+      backoffMultiplier: 2,
+    });
+    connection.connect();
+
+    const ws0 = instances[instances.length - 1]!;
+    ws0.simulateOpen();
+    ws0.simulateClose();
+
+    const expectedDelays = [1000, 2000, 4000];
+
+    for (const delay of expectedDelays) {
+      const countBefore = instances.length;
+
+      vi.advanceTimersByTime(delay - 1);
+      expect(instances.length).toBe(countBefore);
+
+      vi.advanceTimersByTime(1);
+      expect(instances.length).toBe(countBefore + 1);
+
+      const ws = instances[instances.length - 1]!;
+      ws.simulateClose();
+    }
+  });
+
+  it('caps delay at maxDelayMs', () => {
+    const { connection, instances } = createReconnectableConnection({
+      maxRetries: -1,
+      initialDelayMs: 1000,
+      maxDelayMs: 5000,
+      backoffMultiplier: 2,
+    });
+    connection.connect();
+
+    const ws0 = instances[instances.length - 1]!;
+    ws0.simulateOpen();
+    ws0.simulateClose();
+
+    for (let i = 0; i < 5; i++) {
+      const expectedDelay = Math.min(1000 * 2 ** i, 5000);
+      vi.advanceTimersByTime(expectedDelay);
+
+      const ws = instances[instances.length - 1]!;
+      ws.simulateClose();
+    }
+
+    const countBefore = instances.length;
+
+    vi.advanceTimersByTime(4999);
+    expect(instances.length).toBe(countBefore);
+
+    vi.advanceTimersByTime(1);
+    expect(instances.length).toBe(countBefore + 1);
+  });
+
+  it('stops retrying after maxRetries reached', () => {
+    const { connection, instances } = createReconnectableConnection({
+      maxRetries: 2,
+      initialDelayMs: 1000,
+    });
+    connection.connect();
+
+    const ws0 = instances[instances.length - 1]!;
+    ws0.simulateOpen();
+    ws0.simulateClose();
+    vi.advanceTimersByTime(1000);
+
+    const ws1 = instances[instances.length - 1]!;
+    ws1.simulateClose();
+    vi.advanceTimersByTime(2000);
+
+    const countAfterRetries = instances.length;
+    const ws2 = instances[instances.length - 1]!;
+    ws2.simulateClose();
+
+    vi.advanceTimersByTime(60000);
+    expect(instances.length).toBe(countAfterRetries);
+    expect(connection.getState()).toBe('disconnected');
+  });
+
+  it('retries infinitely when maxRetries is -1', () => {
+    const { connection, instances } = createReconnectableConnection({
+      maxRetries: -1,
+      initialDelayMs: 100,
+      maxDelayMs: 1000,
+    });
+    connection.connect();
+
+    for (let i = 0; i < 7; i++) {
+      const ws = instances[instances.length - 1]!;
+      ws.simulateOpen();
+      ws.simulateClose();
+      vi.advanceTimersByTime(1000);
+    }
+
+    expect(instances.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('resets retry count on successful connection', () => {
+    const { connection, instances } = createReconnectableConnection({
+      maxRetries: -1,
+      initialDelayMs: 1000,
+      backoffMultiplier: 2,
+    });
+    connection.connect();
+
+    const ws0 = instances[instances.length - 1]!;
+    ws0.simulateOpen();
+    ws0.simulateClose();
+    vi.advanceTimersByTime(1000);
+
+    const ws1 = instances[instances.length - 1]!;
+    ws1.simulateClose();
+    vi.advanceTimersByTime(2000);
+
+    const ws2 = instances[instances.length - 1]!;
+    ws2.simulateOpen();
+
+    const countBefore = instances.length;
+    ws2.simulateClose();
+
+    vi.advanceTimersByTime(999);
+    expect(instances.length).toBe(countBefore);
+
+    vi.advanceTimersByTime(1);
+    expect(instances.length).toBe(countBefore + 1);
+  });
+
+  it('disconnect() cancels pending reconnect', () => {
+    const { connection, instances } = createReconnectableConnection({ initialDelayMs: 1000 });
+    connection.connect();
+    const ws = instances[instances.length - 1]!;
+    ws.simulateOpen();
+    ws.simulateClose();
+
+    expect(connection.getState()).toBe('reconnecting');
+
+    const countBefore = instances.length;
+    connection.disconnect();
+
+    vi.advanceTimersByTime(60000);
+
+    expect(instances.length).toBe(countBefore);
+    expect(connection.getState()).toBe('disconnected');
+  });
+
+  it('disconnect() prevents future reconnect attempts', () => {
+    const { connection, instances } = createReconnectableConnection({ initialDelayMs: 1000 });
+    connection.connect();
+    const ws = instances[instances.length - 1]!;
+    ws.simulateOpen();
+
+    connection.disconnect();
+
+    const countAfterDisconnect = instances.length;
+
+    vi.advanceTimersByTime(60000);
+
+    expect(instances.length).toBe(countAfterDisconnect);
+    expect(connection.getState()).toBe('disconnected');
+  });
+
+  it('only schedules one reconnect when onerror fires followed by onclose', () => {
+    const { connection, instances } = createReconnectableConnection({
+      maxRetries: -1,
+      initialDelayMs: 1000,
+    });
+    connection.connect();
+    const ws = instances[instances.length - 1]!;
+    ws.simulateOpen();
+
+    const countBefore = instances.length;
+
+    ws.simulateError(new Error('connection lost'));
+    ws.simulateClose(1006, 'abnormal');
+
+    expect(connection.getState()).toBe('reconnecting');
+
+    vi.advanceTimersByTime(1000);
+
+    expect(instances.length).toBe(countBefore + 1);
+    expect(connection.getState()).toBe('connecting');
   });
 });

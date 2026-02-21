@@ -56,7 +56,13 @@ export async function createSignalingHandle(
     'Detected machine capabilities'
   );
 
-  const connection = new PersonalRoomConnection({ url: wsUrl.toString() });
+  const connection = new PersonalRoomConnection({
+    url: wsUrl.toString(),
+    maxRetries: -1,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    backoffMultiplier: 2,
+  });
   const signaling = createDaemonSignaling({
     connection,
     machineId,
@@ -68,6 +74,12 @@ export async function createSignalingHandle(
     if (state === 'connected') {
       signaling.register();
       log.info({ machineId, machineName }, 'Registered with signaling server');
+    }
+    if (state === 'reconnecting') {
+      log.info({ machineId }, 'Reconnecting to signaling server');
+    }
+    if (state === 'disconnected') {
+      log.warn({ machineId }, 'Disconnected from signaling server');
     }
   });
 

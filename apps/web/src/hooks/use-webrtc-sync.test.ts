@@ -141,6 +141,7 @@ describe('useWebRTCSync', () => {
         connection: null,
         webrtcAdapter: null,
         targetMachineId: null,
+        connectionState: 'disconnected',
       })
     );
 
@@ -156,6 +157,7 @@ describe('useWebRTCSync', () => {
         connection: mockConn as never,
         webrtcAdapter: mockAdapter as never,
         targetMachineId: null,
+        connectionState: 'connected',
       })
     );
 
@@ -171,6 +173,7 @@ describe('useWebRTCSync', () => {
         connection: mockConn as never,
         webrtcAdapter: mockAdapter as never,
         targetMachineId: 'machine-1',
+        connectionState: 'connected',
       })
     );
 
@@ -200,6 +203,7 @@ describe('useWebRTCSync', () => {
         connection: mockConn as never,
         webrtcAdapter: mockAdapter as never,
         targetMachineId: 'machine-1',
+        connectionState: 'connected',
       })
     );
 
@@ -227,6 +231,7 @@ describe('useWebRTCSync', () => {
         connection: mockConn as never,
         webrtcAdapter: mockAdapter as never,
         targetMachineId: 'machine-1',
+        connectionState: 'connected',
       })
     );
 
@@ -255,6 +260,7 @@ describe('useWebRTCSync', () => {
         connection: mockConn as never,
         webrtcAdapter: mockAdapter as never,
         targetMachineId: 'machine-1',
+        connectionState: 'connected',
       })
     );
 
@@ -280,6 +286,7 @@ describe('useWebRTCSync', () => {
         connection: null,
         webrtcAdapter: null,
         targetMachineId: null,
+        connectionState: 'disconnected',
       })
     );
 
@@ -292,6 +299,7 @@ describe('useWebRTCSync', () => {
         connection: null,
         webrtcAdapter: null,
         targetMachineId: null,
+        connectionState: 'disconnected',
       })
     );
 
@@ -308,6 +316,7 @@ describe('useWebRTCSync', () => {
         connection: mockConn as never,
         webrtcAdapter: mockAdapter as never,
         targetMachineId: 'machine-1',
+        connectionState: 'connected',
       })
     );
 
@@ -328,6 +337,122 @@ describe('useWebRTCSync', () => {
     expect(mockCreatedTerminalChannels[0]?.binaryType).toBe('arraybuffer');
   });
 
+  describe('reconnection', () => {
+    it('stays in failed state when peer connection fails (bug demonstration)', async () => {
+      vi.useFakeTimers();
+      const mockConn = createMockConnection();
+      const mockAdapter = createMockAdapter();
+
+      const { result } = renderHook(() =>
+        useWebRTCSync({
+          connection: mockConn as never,
+          webrtcAdapter: mockAdapter as never,
+          targetMachineId: 'machine-1',
+          connectionState: 'connected',
+        })
+      );
+
+      await vi.waitFor(() => {
+        expect(mockConn.send).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'webrtc-offer' })
+        );
+      });
+
+      // Simulate peer connection failure
+      mockPcConnectionState = 'failed';
+      act(() => {
+        const handlers = mockPcListeners.connectionstatechange;
+        if (handlers) {
+          for (const handler of handlers) handler();
+        }
+      });
+
+      expect(result.current.peerState).toBe('failed');
+
+      // Wait 5 seconds — no recovery should happen (this is the bug)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      // BUG: peerState is still 'failed' — no auto-reconnect logic exists
+      expect(result.current.peerState).toBe('failed');
+
+      vi.useRealTimers();
+    });
+
+    it('re-negotiates when signaling reconnects (connectionState cycles)', async () => {
+      const mockConn = createMockConnection();
+      const mockAdapter = createMockAdapter();
+
+      const { result, rerender } = renderHook(
+        (props: {
+          connection: typeof mockConn | null;
+          webrtcAdapter: typeof mockAdapter | null;
+          targetMachineId: string | null;
+          connectionState: string;
+        }) =>
+          useWebRTCSync({
+            connection: props.connection as never,
+            webrtcAdapter: props.webrtcAdapter as never,
+            targetMachineId: props.targetMachineId,
+            connectionState: props.connectionState as never,
+          }),
+        {
+          initialProps: {
+            connection: mockConn,
+            webrtcAdapter: mockAdapter,
+            targetMachineId: 'machine-1',
+            connectionState: 'connected',
+          },
+        }
+      );
+
+      // Wait for initial offer
+      await vi.waitFor(() => {
+        expect(mockConn.send).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'webrtc-offer' })
+        );
+      });
+
+      expect(result.current.peerState).toBe('connecting');
+      vi.clearAllMocks();
+      mockDataChannelListeners = {};
+      mockPcListeners = {};
+
+      // Simulate signaling disconnect
+      rerender({
+        connection: mockConn,
+        webrtcAdapter: mockAdapter,
+        targetMachineId: 'machine-1',
+        connectionState: 'reconnecting',
+      });
+
+      // Should go idle while disconnected
+      expect(result.current.peerState).toBe('idle');
+      // Old peer connection should be cleaned up
+      expect(mockPeerConnection.close).toHaveBeenCalled();
+      vi.clearAllMocks();
+
+      // Simulate signaling reconnect — connectionState returns to 'connected'
+      rerender({
+        connection: mockConn,
+        webrtcAdapter: mockAdapter,
+        targetMachineId: 'machine-1',
+        connectionState: 'connected',
+      });
+
+      // Should re-negotiate: create a new offer
+      await vi.waitFor(() => {
+        expect(mockPeerConnection.createOffer).toHaveBeenCalled();
+        expect(mockConn.send).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'webrtc-offer' })
+        );
+      });
+
+      expect(result.current.peerState).toBe('connecting');
+    });
+  });
+
   it('cleans up on unmount', async () => {
     const mockConn = createMockConnection();
     const mockAdapter = createMockAdapter();
@@ -337,6 +462,7 @@ describe('useWebRTCSync', () => {
         connection: mockConn as never,
         webrtcAdapter: mockAdapter as never,
         targetMachineId: 'machine-1',
+        connectionState: 'connected',
       })
     );
 
