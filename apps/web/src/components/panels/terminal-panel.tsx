@@ -4,7 +4,7 @@ import { Button } from '@heroui/react';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { Terminal, X } from 'lucide-react';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { useVerticalResizablePanel } from '../../hooks/use-vertical-resizable-panel';
 import { useUIStore } from '../../stores';
 
@@ -46,6 +46,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const sessionsRef = useRef(new Map<string, TerminalSession>());
+    const sessionKey = useMemo(() => activeTaskId ?? '__default__', [activeTaskId]);
 
     const terminalPanelHeight = useUIStore((s) => s.terminalPanelHeight);
     const setTerminalPanelHeight = useUIStore((s) => s.setTerminalPanelHeight);
@@ -97,14 +98,12 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       const container = containerRef.current;
       if (!container) return;
 
-      if (!isOpen || !activeTaskId) {
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
+      if (!isOpen) {
+        while (container.firstChild) container.removeChild(container.firstChild);
         return;
       }
 
-      const session = ensureSession(activeTaskId);
+      const session = ensureSession(sessionKey);
 
       while (container.firstChild) {
         container.removeChild(container.firstChild);
@@ -121,17 +120,17 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           container.removeChild(session.wrapperDiv);
         }
       };
-    }, [isOpen, activeTaskId, ensureSession]);
+    }, [isOpen, sessionKey, ensureSession]);
 
     /** Effect: channel wiring -- create/reuse a data channel for the active task */
     useEffect(() => {
-      if (!isOpen || !activeTaskId) return;
+      if (!isOpen) return;
 
-      const session = sessionsRef.current.get(activeTaskId);
+      const session = sessionsRef.current.get(sessionKey);
       if (!session) return;
 
       if (!session.channel || session.channel.readyState === 'closed') {
-        const ch = createTerminalChannel(activeTaskId);
+        const ch = createTerminalChannel(sessionKey);
         if (!ch) return;
         session.channel = ch;
       }
@@ -180,14 +179,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         }
         session.disposers = [];
       };
-    }, [isOpen, activeTaskId, createTerminalChannel, peerState, selectedEnvironmentPath]);
+    }, [isOpen, sessionKey, createTerminalChannel, peerState, selectedEnvironmentPath]);
 
     useEffect(() => {
       const container = containerRef.current;
-      if (!container || !isOpen || !activeTaskId) return;
+      if (!container || !isOpen) return;
 
       const observer = new ResizeObserver(() => {
-        const session = sessionsRef.current.get(activeTaskId);
+        const session = sessionsRef.current.get(sessionKey);
         if (!session) return;
         requestAnimationFrame(() => {
           session.fitAddon.fit();
@@ -199,7 +198,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
       observer.observe(container);
       return () => observer.disconnect();
-    }, [isOpen, activeTaskId]);
+    }, [isOpen, sessionKey]);
 
     useEffect(() => {
       return () => {
@@ -220,13 +219,13 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       ref,
       () => ({
         focus: () => {
-          if (activeTaskId) sessionsRef.current.get(activeTaskId)?.xterm.focus();
+          sessionsRef.current.get(sessionKey)?.xterm.focus();
         },
         write: (data: string | Uint8Array) => {
-          if (activeTaskId) sessionsRef.current.get(activeTaskId)?.xterm.write(data);
+          sessionsRef.current.get(sessionKey)?.xterm.write(data);
         },
       }),
-      [activeTaskId]
+      [sessionKey]
     );
 
     return (
