@@ -1936,6 +1936,23 @@ describe('SessionManager', () => {
       await sessionPromise;
     });
 
+    it('setPermissionMode delegates to query.setPermissionMode()', async () => {
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      ctrl.emit(initMsg('sess-perm'));
+
+      await manager.setPermissionMode('bypassPermissions');
+
+      expect(ctrl.query.setPermissionMode).toHaveBeenCalledWith('bypassPermissions');
+
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
+    });
+
     it('createSession sets status to starting initially', async () => {
       const ctrl = mockQueryControllable();
       mockQuery.mockReturnValue(ctrl.query);

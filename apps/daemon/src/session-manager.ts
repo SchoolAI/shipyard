@@ -392,6 +392,10 @@ export class SessionManager {
     this.#currentModel = model;
   }
 
+  async setPermissionMode(mode: PermissionMode): Promise<void> {
+    await this.#activeQuery?.setPermissionMode(mode);
+  }
+
   /**
    * Resume an existing Claude Code session using streaming input mode.
    * Looks up the agentSessionId from the task doc and passes it as `resume`.
