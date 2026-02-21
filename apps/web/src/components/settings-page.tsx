@@ -1,9 +1,11 @@
-import { Button, Chip } from '@heroui/react';
+import { Button, Chip, Description, Dropdown, Label } from '@heroui/react';
 import { change, type TypedDoc } from '@loro-extended/change';
 import { useDoc } from '@loro-extended/react';
 import type {
   AnthropicLoginResponseEphemeralValue,
   MachineCapabilitiesEphemeralValue,
+  PermissionMode,
+  ReasoningEffort,
   TaskIndexDocumentShape,
   WorktreeScriptValue,
 } from '@shipyard/loro-schema';
@@ -11,17 +13,23 @@ import {
   buildDocumentId,
   DEFAULT_EPOCH,
   LOCAL_USER_ID,
+  PERMISSION_MODES,
+  REASONING_EFFORTS,
   ROOM_EPHEMERAL_DECLARATIONS,
   TaskIndexDocumentSchema,
 } from '@shipyard/loro-schema';
 import {
   ArrowLeft,
+  Brain,
   CheckCircle,
+  ChevronDown,
   ExternalLink,
   Key,
   Loader2,
   Monitor,
   Plus,
+  Settings2,
+  Shield,
   Terminal,
   Trash2,
   XCircle,
@@ -190,6 +198,12 @@ export function SettingsPage({
           roomHandle={roomHandle}
         />
 
+        <ComposerDefaultsSection
+          typedDoc={typedDoc}
+          roomDocHandle={roomDocHandle}
+          capabilitiesByMachine={capabilitiesByMachine}
+        />
+
         <section aria-labelledby="worktree-scripts-heading" className="mt-8">
           <div className="flex items-center gap-2 mb-4">
             <Terminal className="w-4 h-4 text-muted" aria-hidden="true" />
@@ -267,6 +281,236 @@ export function SettingsPage({
         </section>
       </div>
     </div>
+  );
+}
+
+const VALID_EFFORTS: readonly string[] = REASONING_EFFORTS;
+const VALID_MODES: readonly string[] = PERMISSION_MODES;
+
+function isReasoningEffort(v: string): v is ReasoningEffort {
+  return VALID_EFFORTS.includes(v);
+}
+
+function isPermissionMode(v: string): v is PermissionMode {
+  return VALID_MODES.includes(v);
+}
+
+const PERMISSION_MODE_OPTIONS: { id: PermissionMode; label: string; description: string }[] = [
+  { id: 'default', label: 'Default', description: 'Prompts for dangerous operations' },
+  { id: 'accept-edits', label: 'Accept Edits', description: 'Auto-accept file edits' },
+  { id: 'plan', label: 'Plan', description: 'No tool execution, planning only' },
+  { id: 'bypass', label: 'Bypass', description: 'Skip all permission checks' },
+];
+
+const REASONING_OPTIONS: { id: string; label: string }[] = [
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
+];
+
+function ComposerDefaultsSection({
+  typedDoc,
+  roomDocHandle,
+  capabilitiesByMachine,
+}: {
+  typedDoc: TypedDoc<TaskIndexDocumentShape>;
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require permissive handle type
+  roomDocHandle: Parameters<typeof useDoc>[0];
+  capabilitiesByMachine: Map<string, MachineCapabilitiesEphemeralValue>;
+}) {
+  type UserSettingsDoc = {
+    userSettings: {
+      composerModel: string | null;
+      composerReasoning: string | null;
+      composerPermission: string | null;
+    };
+  };
+  /* eslint-disable no-restricted-syntax -- loro-extended generic erasure requires cast */
+  const currentModel = useDoc(
+    roomDocHandle,
+    (d) => (d as never as UserSettingsDoc).userSettings.composerModel
+  );
+  const currentReasoning = useDoc(
+    roomDocHandle,
+    (d) => (d as never as UserSettingsDoc).userSettings.composerReasoning
+  );
+  const currentPermission = useDoc(
+    roomDocHandle,
+    (d) => (d as never as UserSettingsDoc).userSettings.composerPermission
+  );
+  /* eslint-enable no-restricted-syntax */
+
+  const availableModels = useMemo(() => {
+    const models: { id: string; label: string; provider: string }[] = [];
+    for (const caps of capabilitiesByMachine.values()) {
+      for (const m of caps.models) {
+        if (!models.some((existing) => existing.id === m.id)) {
+          models.push({ id: m.id, label: m.label, provider: m.provider });
+        }
+      }
+    }
+    return models;
+  }, [capabilitiesByMachine]);
+
+  const modelDisplay = currentModel
+    ? (availableModels.find((m) => m.id === currentModel)?.label ?? currentModel)
+    : 'Claude Opus 4.6';
+
+  const reasoningDisplay =
+    REASONING_OPTIONS.find((r) => r.id === currentReasoning)?.label ?? 'Medium';
+
+  const permissionDisplay =
+    PERMISSION_MODE_OPTIONS.find((p) => p.id === currentPermission)?.label ?? 'Default';
+
+  const handleModelChange = useCallback(
+    (modelId: string) => {
+      change(typedDoc, (draft) => {
+        draft.userSettings.composerModel = modelId;
+      });
+    },
+    [typedDoc]
+  );
+
+  const handleReasoningChange = useCallback(
+    (effort: ReasoningEffort) => {
+      change(typedDoc, (draft) => {
+        draft.userSettings.composerReasoning = effort;
+      });
+    },
+    [typedDoc]
+  );
+
+  const handlePermissionChange = useCallback(
+    (mode: PermissionMode) => {
+      change(typedDoc, (draft) => {
+        draft.userSettings.composerPermission = mode;
+      });
+    },
+    [typedDoc]
+  );
+
+  return (
+    <section aria-labelledby="composer-defaults-heading" className="mt-8">
+      <div className="flex items-center gap-2 mb-4">
+        <Settings2 className="w-4 h-4 text-muted" aria-hidden="true" />
+        <h3 id="composer-defaults-heading" className="text-base font-medium text-foreground">
+          Composer Defaults
+        </h3>
+      </div>
+      <p className="text-sm text-muted mb-4">
+        Default settings for new tasks. These auto-update when you change settings in a task, or set
+        them explicitly here.
+      </p>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between rounded-lg border border-separator bg-surface/50 px-3 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <Monitor className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden="true" />
+            <span className="text-sm text-foreground">Model</span>
+          </div>
+          {availableModels.length > 0 ? (
+            <Dropdown>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1 text-xs text-muted hover:text-foreground"
+              >
+                <span className="truncate max-w-[10rem]">{modelDisplay}</span>
+                <ChevronDown className="w-3 h-3" aria-hidden="true" />
+              </Button>
+              <Dropdown.Popover placement="bottom end" className="min-w-[220px]">
+                <Dropdown.Menu
+                  selectionMode="single"
+                  selectedKeys={new Set([currentModel ?? 'claude-opus-4-6'])}
+                  onSelectionChange={(keys) => {
+                    const selected = [...keys][0];
+                    if (typeof selected === 'string') handleModelChange(selected);
+                  }}
+                >
+                  {availableModels.map((model) => (
+                    <Dropdown.Item key={model.id} id={model.id} textValue={model.label}>
+                      <Label>{model.label}</Label>
+                      <Description>{model.provider}</Description>
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+          ) : (
+            <span className="text-xs text-muted">{modelDisplay}</span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-separator bg-surface/50 px-3 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <Brain className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden="true" />
+            <span className="text-sm text-foreground">Reasoning Effort</span>
+          </div>
+          <Dropdown>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1 text-xs text-muted hover:text-foreground"
+            >
+              {reasoningDisplay}
+              <ChevronDown className="w-3 h-3" aria-hidden="true" />
+            </Button>
+            <Dropdown.Popover placement="bottom end" className="min-w-[140px]">
+              <Dropdown.Menu
+                selectionMode="single"
+                selectedKeys={new Set([currentReasoning ?? 'medium'])}
+                onSelectionChange={(keys) => {
+                  const selected = [...keys][0];
+                  if (typeof selected === 'string' && isReasoningEffort(selected))
+                    handleReasoningChange(selected);
+                }}
+              >
+                {REASONING_OPTIONS.map((r) => (
+                  <Dropdown.Item key={r.id} id={r.id} textValue={r.label}>
+                    <Label>{r.label}</Label>
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-separator bg-surface/50 px-3 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <Shield className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden="true" />
+            <span className="text-sm text-foreground">Permission Mode</span>
+          </div>
+          <Dropdown>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1 text-xs text-muted hover:text-foreground"
+            >
+              {permissionDisplay}
+              <ChevronDown className="w-3 h-3" aria-hidden="true" />
+            </Button>
+            <Dropdown.Popover placement="bottom end" className="min-w-[240px]">
+              <Dropdown.Menu
+                selectionMode="single"
+                selectedKeys={new Set([currentPermission ?? 'default'])}
+                onSelectionChange={(keys) => {
+                  const selected = [...keys][0];
+                  if (typeof selected === 'string' && isPermissionMode(selected))
+                    handlePermissionChange(selected);
+                }}
+              >
+                {PERMISSION_MODE_OPTIONS.map((p) => (
+                  <Dropdown.Item key={p.id} id={p.id} textValue={p.label}>
+                    <Label>{p.label}</Label>
+                    <Description>{p.description}</Description>
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        </div>
+      </div>
+    </section>
   );
 }
 

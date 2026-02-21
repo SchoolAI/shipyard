@@ -326,6 +326,75 @@ describe('room helpers', () => {
   });
 });
 
+describe('UserSettings composer preferences', () => {
+  let doc: ReturnType<typeof createTypedDoc<typeof TaskIndexDocumentSchema>>;
+
+  beforeEach(() => {
+    doc = createTypedDoc(TaskIndexDocumentSchema, { doc: new LoroDoc() });
+  });
+
+  it('defaults to null for unset preferences', () => {
+    const json = doc.toJSON();
+    expect(json.userSettings.composerModel).toBeNull();
+    expect(json.userSettings.composerReasoning).toBeNull();
+    expect(json.userSettings.composerPermission).toBeNull();
+  });
+
+  it('stores and reads composer model', () => {
+    change(doc, (draft) => {
+      draft.userSettings.composerModel = 'claude-sonnet-4-5-20250929';
+    });
+
+    expect(doc.toJSON().userSettings.composerModel).toBe('claude-sonnet-4-5-20250929');
+  });
+
+  it('stores and reads composer reasoning effort', () => {
+    change(doc, (draft) => {
+      draft.userSettings.composerReasoning = 'high';
+    });
+
+    expect(doc.toJSON().userSettings.composerReasoning).toBe('high');
+  });
+
+  it('stores and reads composer permission mode', () => {
+    change(doc, (draft) => {
+      draft.userSettings.composerPermission = 'plan';
+    });
+
+    expect(doc.toJSON().userSettings.composerPermission).toBe('plan');
+  });
+
+  it('can reset preferences to null', () => {
+    change(doc, (draft) => {
+      draft.userSettings.composerModel = 'claude-opus-4-6';
+      draft.userSettings.composerReasoning = 'high';
+      draft.userSettings.composerPermission = 'bypass';
+    });
+
+    change(doc, (draft) => {
+      draft.userSettings.composerModel = null;
+      draft.userSettings.composerReasoning = null;
+      draft.userSettings.composerPermission = null;
+    });
+
+    const json = doc.toJSON();
+    expect(json.userSettings.composerModel).toBeNull();
+    expect(json.userSettings.composerReasoning).toBeNull();
+    expect(json.userSettings.composerPermission).toBeNull();
+  });
+
+  it('preferences do not affect worktreeScripts', () => {
+    change(doc, (draft) => {
+      draft.userSettings.composerModel = 'claude-opus-4-6';
+      draft.userSettings.worktreeScripts.set('/repo', { script: 'pnpm install' });
+    });
+
+    const json = doc.toJSON();
+    expect(json.userSettings.composerModel).toBe('claude-opus-4-6');
+    expect(json.userSettings.worktreeScripts['/repo']?.script).toBe('pnpm install');
+  });
+});
+
 describe('concurrent CRDT merge', () => {
   const now = Date.now();
 

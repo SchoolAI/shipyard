@@ -56,6 +56,9 @@ export const WorktreeScriptShape = Shape.plain.struct({
  */
 export const UserSettingsShape = Shape.struct({
   worktreeScripts: Shape.record(WorktreeScriptShape),
+  composerModel: Shape.plain.string().nullable(),
+  composerReasoning: Shape.plain.string(...REASONING_EFFORTS).nullable(),
+  composerPermission: Shape.plain.string(...PERMISSION_MODES).nullable(),
 });
 
 /**
