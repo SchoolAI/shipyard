@@ -13,7 +13,7 @@ export function LoginPage() {
       useAuthStore.getState().setError('GitHub OAuth is not configured');
       return;
     }
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = `${window.location.origin}/`;
     window.location.href = buildGitHubAuthorizeUrl(clientId, redirectUri);
   }
 

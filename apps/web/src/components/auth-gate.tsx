@@ -52,7 +52,7 @@ export function AuthGate({ children }: AuthGateProps) {
     }
 
     setExchanging(true);
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = `${window.location.origin}/`;
 
     exchangeCodeForToken(params.code, redirectUri, sessionServerUrl)
       .then(({ token: newToken, user }) => {
