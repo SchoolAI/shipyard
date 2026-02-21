@@ -132,5 +132,6 @@ export {
   SessionEntryShape,
   SUPPORTED_IMAGE_MEDIA_TYPES,
   TaskDocumentSchema,
+  TERMINAL_TASK_STATES,
   TOOL_RISK_LEVELS,
 } from './shapes.js';

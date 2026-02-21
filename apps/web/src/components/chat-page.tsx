@@ -18,6 +18,7 @@ import {
   TaskDocumentSchema,
   TaskIndexDocumentSchema,
   type TaskIndexDocumentShape,
+  TERMINAL_TASK_STATES,
 } from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1014,6 +1015,8 @@ function ChatPageInner() {
 
     const unsub = connection.onMessage((msg) => {
       if (msg.type === 'agent-joined' && msg.agent.machineId === selectedMachineId) {
+        const status = taskStatusRef.current;
+        if (status && TERMINAL_TASK_STATES.includes(status)) return;
         connection.send({
           type: 'notify-task',
           requestId: crypto.randomUUID(),

@@ -22,6 +22,7 @@ import {
   type TaskDocumentShape,
   TaskIndexDocumentSchema,
   type TaskIndexDocumentShape,
+  TERMINAL_TASK_STATES,
   updateTaskInIndex,
 } from '@shipyard/loro-schema';
 import type { MachineCapabilities, PersonalRoomServerMessage } from '@shipyard/session';
@@ -119,7 +120,7 @@ interface ActiveTask {
   lastDispatchedConvLen: number;
 }
 
-const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled']);
+const TERMINAL_STATUSES = new Set(TERMINAL_TASK_STATES);
 
 /**
  * Load all non-terminal task documents from storage so they are serveable
@@ -136,7 +137,9 @@ async function rehydrateTaskDocuments(
   try {
     await roomHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
   } catch {
-    log.info('Room doc storage sync timed out during rehydration');
+    log.warn(
+      'Room doc storage sync timed out during rehydration — task rehydration may be incomplete'
+    );
   }
 
   const roomJson = roomDoc.toJSON();
