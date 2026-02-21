@@ -1,6 +1,7 @@
+import { IndexedDBStorageAdapter } from '@loro-extended/adapter-indexeddb';
 import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import { RepoContext, useRepo } from '@loro-extended/react';
-import type { RepoParams } from '@loro-extended/repo';
+import type { AnyAdapter, RepoParams } from '@loro-extended/repo';
 import { Repo } from '@loro-extended/repo';
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 
@@ -51,9 +52,13 @@ export function ShipyardRepoProvider({
     } else {
       const webrtc = new WebRtcDataChannelAdapter();
       adapter = webrtc;
+      const adapters: AnyAdapter[] = [webrtc];
+      if (typeof indexedDB !== 'undefined') {
+        adapters.unshift(new IndexedDBStorageAdapter());
+      }
       repoParams = {
         identity: { name: 'browser' },
-        adapters: [webrtc],
+        adapters,
       };
     }
 

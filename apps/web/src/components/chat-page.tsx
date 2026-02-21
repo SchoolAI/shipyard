@@ -535,7 +535,10 @@ function ChatPageInner() {
 
     let raw: ChatMessageData[];
 
-    if (useLoro && (loroTask.conversation?.length ?? 0) > 0) {
+    if (
+      useLoro &&
+      ((loroTask.conversation?.length ?? 0) > 0 || (loroTask.pendingFollowUps?.length ?? 0) > 0)
+    ) {
       raw = loroTask.conversation.map((msg) => ({
         id: msg.messageId ?? crypto.randomUUID(),
         role: msg.role,
