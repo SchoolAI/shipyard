@@ -24,6 +24,7 @@ function makeCaps(
     environments: [],
     permissionModes: [],
     homeDir: null,
+    anthropicAuth: null,
     ...overrides,
   };
 }

@@ -17,6 +17,7 @@ const EMPTY_CAPABILITIES: MachineCapabilitiesEphemeralValue = {
   environments: [],
   permissionModes: [],
   homeDir: null,
+  anthropicAuth: null,
 };
 
 export interface MachineGroup {
@@ -84,6 +85,7 @@ export function useMachineSelection(
   );
 
   const homeDir = selectedMachine?.capabilities.homeDir ?? undefined;
+  const anthropicAuth = selectedMachine?.capabilities.anthropicAuth ?? null;
 
   return {
     machines,
@@ -94,5 +96,7 @@ export function useMachineSelection(
     availableEnvironments,
     availablePermissionModes,
     homeDir,
+    anthropicAuth,
+    capabilitiesByMachine,
   };
 }

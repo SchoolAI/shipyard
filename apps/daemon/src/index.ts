@@ -68,8 +68,12 @@ function parseCliArgs(): CliArgs {
         '  -s, --serve              Run in serve mode (signaling + spawn-agent)',
         '  -h, --help               Show this help',
         '',
+        'Authentication:',
+        '  Run `claude auth login` to authenticate with Anthropic (primary method).',
+        '  Alternatively, set ANTHROPIC_API_KEY for CI/headless environments.',
+        '',
         'Environment:',
-        '  ANTHROPIC_API_KEY         API key for Claude (required for task mode)',
+        '  ANTHROPIC_API_KEY         API key for Claude (optional, overrides OAuth)',
         '  SHIPYARD_DEV              Set to 1 for dev mode (uses ~/.shipyard-dev/)',
         '  SHIPYARD_DATA_DIR         Data directory (overridden by --data-dir)',
         '  LOG_LEVEL                 Log level: debug, info, warn, error (default: info)',
@@ -232,14 +236,9 @@ async function loadAuthFromConfig(env: Env): Promise<void> {
   logger.warn('No auth token found. Run `shipyard login` to authenticate.');
 }
 
-function validateTaskArgs(args: CliArgs, env: Env): void {
+function validateTaskArgs(args: CliArgs): void {
   if (!args.prompt && !args.resume) {
     logger.error('Either --prompt, --resume, or --serve is required. Use --help for usage.');
-    process.exit(1);
-  }
-
-  if (!env.ANTHROPIC_API_KEY) {
-    logger.error('ANTHROPIC_API_KEY is required when running tasks. Use --help for usage.');
     process.exit(1);
   }
 }
@@ -279,7 +278,7 @@ async function main(): Promise<void> {
     return serve(env);
   }
 
-  validateTaskArgs(args, env);
+  validateTaskArgs(args);
 
   const dataDir = resolve(args.dataDir ?? env.SHIPYARD_DATA_DIR.replace('~', homedir()));
   const taskId = args.taskId ?? generateTaskId();

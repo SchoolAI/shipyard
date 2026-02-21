@@ -287,6 +287,7 @@ export function ChatPage() {
     availableModels,
     availableEnvironments,
     homeDir,
+    capabilitiesByMachine: capsByMachine,
   } = useMachineSelection(agents, capabilitiesByMachine);
 
   const repo = useRepo();
@@ -1062,6 +1063,9 @@ export function ChatPage() {
               <SettingsPage
                 onBack={handleCloseSettings}
                 availableEnvironments={availableEnvironments}
+                machines={machines}
+                capabilitiesByMachine={capsByMachine}
+                roomHandle={roomHandle}
               />
             ) : (
               <>

@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
 import { resolve } from 'node:path';
@@ -28,6 +29,7 @@ import { SignalingClient } from '@shipyard/session/client';
 import { type BranchWatcher, createBranchWatcher } from './branch-watcher.js';
 import {
   captureTreeSnapshot,
+  detectAnthropicAuth,
   detectEnvironments,
   getBranchDiff,
   getBranchFiles,
@@ -446,6 +448,13 @@ export async function serve(env: Env): Promise<void> {
       })),
       permissionModes: caps.permissionModes,
       homeDir: caps.homeDir ?? null,
+      anthropicAuth: caps.anthropicAuth
+        ? {
+            status: caps.anthropicAuth.status,
+            method: caps.anthropicAuth.method,
+            email: caps.anthropicAuth.email ?? null,
+          }
+        : null,
     };
     roomHandle.capabilities.set(machineId, value);
     log.info({ machineId }, 'Published capabilities to room ephemeral');
@@ -486,12 +495,13 @@ export async function serve(env: Env): Promise<void> {
       'Received enhance-prompt request via ephemeral'
     );
 
-    if (!env.ANTHROPIC_API_KEY) {
-      enhLog.error('ANTHROPIC_API_KEY is required for prompt enhancement');
+    if (capabilities.anthropicAuth?.status !== 'authenticated') {
+      enhLog.error('Not authenticated with Anthropic');
       typedRoomHandle.enhancePromptResps.set(requestId, {
         status: 'error',
         text: '',
-        error: 'ANTHROPIC_API_KEY not configured on daemon',
+        error:
+          "Not authenticated with Anthropic. Run 'claude auth login' or set ANTHROPIC_API_KEY.",
       });
       scheduleEphemeralCleanup(() => {
         typedRoomHandle.enhancePromptReqs.delete(requestId);
@@ -557,6 +567,107 @@ export async function serve(env: Env): Promise<void> {
       .finally(() => {
         processedRequestIds.delete(requestId);
       });
+  });
+
+  typedRoomHandle.anthropicLoginReqs.subscribe(({ key: requestId, value, source }) => {
+    if (source !== 'remote') return;
+    if (!value) return;
+    if (value.machineId !== machineId) return;
+    if (processedRequestIds.has(requestId)) return;
+    processedRequestIds.add(requestId);
+
+    const loginLog = createChildLogger({ mode: `anthropic-login:${requestId}` });
+    loginLog.info('Received Anthropic login request via ephemeral');
+
+    typedRoomHandle.anthropicLoginResps.set(requestId, {
+      status: 'starting',
+      loginUrl: null,
+      error: null,
+    });
+
+    const child = spawn('claude', ['auth', 'login'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString();
+      stdout += text;
+
+      const urlMatch = text.match(/https:\/\/\S+/);
+      if (urlMatch) {
+        typedRoomHandle.anthropicLoginResps.set(requestId, {
+          status: 'waiting',
+          loginUrl: urlMatch[0],
+          error: null,
+        });
+      }
+    });
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString();
+      stdout += text;
+
+      const urlMatch = text.match(/https:\/\/\S+/);
+      if (urlMatch) {
+        typedRoomHandle.anthropicLoginResps.set(requestId, {
+          status: 'waiting',
+          loginUrl: urlMatch[0],
+          error: null,
+        });
+      }
+    });
+
+    child.on('exit', (exitCode) => {
+      if (exitCode === 0) {
+        loginLog.info('Anthropic login completed successfully');
+
+        detectAnthropicAuth()
+          .then((authStatus) => {
+            capabilities.anthropicAuth = authStatus;
+            publishCapabilities(capabilities);
+            loginLog.info({ authStatus }, 'Re-detected auth after login');
+          })
+          .catch((err: unknown) => {
+            loginLog.warn({ err }, 'Failed to re-detect auth after login');
+          });
+
+        typedRoomHandle.anthropicLoginResps.set(requestId, {
+          status: 'done',
+          loginUrl: null,
+          error: null,
+        });
+      } else {
+        loginLog.error({ exitCode, stdout }, 'Anthropic login failed');
+        typedRoomHandle.anthropicLoginResps.set(requestId, {
+          status: 'error',
+          loginUrl: null,
+          error: `Login failed (exit code ${exitCode})`,
+        });
+      }
+
+      scheduleEphemeralCleanup(() => {
+        typedRoomHandle.anthropicLoginReqs.delete(requestId);
+        typedRoomHandle.anthropicLoginResps.delete(requestId);
+      }, EPHEMERAL_CLEANUP_DELAY_MS);
+      processedRequestIds.delete(requestId);
+    });
+
+    child.on('error', (err) => {
+      loginLog.error({ err: err.message }, 'Failed to spawn claude auth login');
+      typedRoomHandle.anthropicLoginResps.set(requestId, {
+        status: 'error',
+        loginUrl: null,
+        error: `Failed to start login: ${err.message}`,
+      });
+
+      scheduleEphemeralCleanup(() => {
+        typedRoomHandle.anthropicLoginReqs.delete(requestId);
+        typedRoomHandle.anthropicLoginResps.delete(requestId);
+      }, EPHEMERAL_CLEANUP_DELAY_MS);
+      processedRequestIds.delete(requestId);
+    });
   });
 
   connection.onStateChange((state) => {
@@ -891,14 +1002,14 @@ function handleNotifyTask(
   const { taskId, requestId } = msg;
   const taskLog = createChildLogger({ mode: 'serve', taskId });
 
-  if (!ctx.env.ANTHROPIC_API_KEY) {
-    taskLog.error('ANTHROPIC_API_KEY is required to run agents');
+  if (ctx.capabilities.anthropicAuth?.status !== 'authenticated') {
+    taskLog.error('Not authenticated with Anthropic');
     ctx.connection.send({
       type: 'task-ack',
       requestId,
       taskId,
       accepted: false,
-      error: 'ANTHROPIC_API_KEY not configured on daemon',
+      error: "Not authenticated with Anthropic. Run 'claude auth login' or set ANTHROPIC_API_KEY.",
     });
     return;
   }
@@ -978,12 +1089,13 @@ function handleEnhancePrompt(
 
   const enhanceLog = createChildLogger({ mode: 'enhance-prompt' });
 
-  if (!ctx.env.ANTHROPIC_API_KEY) {
-    enhanceLog.error('ANTHROPIC_API_KEY is required for prompt enhancement');
+  if (ctx.capabilities.anthropicAuth?.status !== 'authenticated') {
+    enhanceLog.error('Not authenticated with Anthropic');
     ctx.connection.send({
       type: 'error',
-      code: 'missing_api_key',
-      message: 'ANTHROPIC_API_KEY not configured on daemon',
+      code: 'not_authenticated',
+      message:
+        "Not authenticated with Anthropic. Run 'claude auth login' or set ANTHROPIC_API_KEY.",
       requestId,
     });
     processedRequestIds.delete(requestId);

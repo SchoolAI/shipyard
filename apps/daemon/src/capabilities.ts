@@ -3,6 +3,7 @@ import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import {
+  type AnthropicAuthStatus,
   type GitRepoInfo,
   type MachineCapabilities,
   type ModelInfo,
@@ -364,10 +365,31 @@ export async function detectEnvironments(): Promise<GitRepoInfo[]> {
   return repoInfos.filter((info): info is GitRepoInfo => info !== null);
 }
 
+export async function detectAnthropicAuth(): Promise<AnthropicAuthStatus> {
+  if (process.env.ANTHROPIC_API_KEY) {
+    return { status: 'authenticated', method: 'api-key' };
+  }
+  try {
+    const stdout = await run('claude', ['auth', 'status', '--json'], undefined);
+    // eslint-disable-next-line no-restricted-syntax -- JSON.parse returns unknown; fields validated below
+    const parsed = JSON.parse(stdout) as { loggedIn?: boolean; email?: string };
+    if (parsed.loggedIn) {
+      return { status: 'authenticated', method: 'oauth', email: parsed.email };
+    }
+    return { status: 'unauthenticated', method: 'none' };
+  } catch {
+    return { status: 'unknown', method: 'none' };
+  }
+}
+
 export async function detectCapabilities(): Promise<MachineCapabilities> {
-  const [models, environments] = await Promise.all([detectModels(), detectEnvironments()]);
+  const [models, environments, anthropicAuth] = await Promise.all([
+    detectModels(),
+    detectEnvironments(),
+    detectAnthropicAuth(),
+  ]);
 
   const permissionModes = [...PermissionModeSchema.options];
 
-  return { models, environments, permissionModes, homeDir: homedir() };
+  return { models, environments, permissionModes, homeDir: homedir(), anthropicAuth };
 }

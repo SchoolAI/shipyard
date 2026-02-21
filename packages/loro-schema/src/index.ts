@@ -34,6 +34,8 @@ export {
   updateTaskInIndex,
 } from './room-helpers.js';
 export type {
+  AnthropicLoginRequestEphemeralValue,
+  AnthropicLoginResponseEphemeralValue,
   EnhancePromptRequestEphemeralValue,
   EnhancePromptResponseEphemeralValue,
   MachineCapabilitiesEphemeralShape,
@@ -50,6 +52,8 @@ export type {
   WorktreeSetupStatus,
 } from './room-schema.js';
 export {
+  AnthropicLoginRequestEphemeral,
+  AnthropicLoginResponseEphemeral,
   EnhancePromptRequestEphemeral,
   EnhancePromptResponseEphemeral,
   MachineCapabilitiesEphemeral,
@@ -66,6 +70,9 @@ export {
 } from './room-schema.js';
 export type {
   A2ATaskState,
+  AnthropicAuthMethod,
+  AnthropicAuthStatus,
+  AnthropicLoginStatus,
   CommentAuthorType,
   ContentBlock,
   ContentBlockType,
@@ -99,6 +106,9 @@ export type {
 } from './shapes.js';
 export {
   A2A_TASK_STATES,
+  ANTHROPIC_AUTH_METHODS,
+  ANTHROPIC_AUTH_STATUSES,
+  ANTHROPIC_LOGIN_STATUSES,
   COMMENT_AUTHOR_TYPES,
   CONTENT_BLOCK_TYPES,
   ContentBlockShape,

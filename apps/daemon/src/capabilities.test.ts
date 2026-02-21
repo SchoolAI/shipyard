@@ -16,6 +16,7 @@ import { execFile } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
 import {
   captureTreeSnapshot,
+  detectAnthropicAuth,
   detectCapabilities,
   detectEnvironments,
   detectModels,
@@ -311,12 +312,16 @@ describe('detectEnvironments', () => {
 });
 
 describe('detectCapabilities', () => {
-  it('combines models, environments, and permission modes', async () => {
+  it('combines models, environments, permission modes, and auth', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
     stubExecFile({
       'which claude': { stdout: '/usr/local/bin/claude' },
       'which codex': { error: new Error('not found') },
       'git branch --show-current': { stdout: 'main' },
       'git remote get-url origin': { stdout: 'git@github.com:user/shipyard.git' },
+      'claude auth status --json': {
+        stdout: JSON.stringify({ loggedIn: true, email: 'dev@test.com' }),
+      },
     });
 
     mockReaddir.mockResolvedValueOnce([makeDirent('shipyard', true)] as never);
@@ -327,6 +332,11 @@ describe('detectCapabilities', () => {
     expect(caps.models).toHaveLength(4);
     expect(caps.environments).toHaveLength(1);
     expect(caps.permissionModes).toEqual(['default', 'accept-edits', 'plan', 'bypass']);
+    expect(caps.anthropicAuth).toEqual({
+      status: 'authenticated',
+      method: 'oauth',
+      email: 'dev@test.com',
+    });
   });
 });
 
@@ -618,5 +628,58 @@ describe('getSnapshotFiles', () => {
     const files = await getSnapshotFiles('/repo', 'abc123', 'def456');
 
     expect(files).toEqual([]);
+  });
+});
+
+describe('detectAnthropicAuth', () => {
+  it('returns api-key when ANTHROPIC_API_KEY is set', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test-key';
+    try {
+      const auth = await detectAnthropicAuth();
+      expect(auth).toEqual({ status: 'authenticated', method: 'api-key' });
+    } finally {
+      delete process.env.ANTHROPIC_API_KEY;
+    }
+  });
+
+  it('returns oauth when claude auth status reports loggedIn', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    stubExecFile({
+      'claude auth status --json': {
+        stdout: JSON.stringify({ loggedIn: true, email: 'user@example.com' }),
+      },
+    });
+
+    const auth = await detectAnthropicAuth();
+
+    expect(auth).toEqual({
+      status: 'authenticated',
+      method: 'oauth',
+      email: 'user@example.com',
+    });
+  });
+
+  it('returns unauthenticated when claude reports not logged in', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    stubExecFile({
+      'claude auth status --json': {
+        stdout: JSON.stringify({ loggedIn: false }),
+      },
+    });
+
+    const auth = await detectAnthropicAuth();
+
+    expect(auth).toEqual({ status: 'unauthenticated', method: 'none' });
+  });
+
+  it('returns unknown when claude is not found', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    stubExecFile({
+      'claude auth status --json': { error: new Error('not found') },
+    });
+
+    const auth = await detectAnthropicAuth();
+
+    expect(auth).toEqual({ status: 'unknown', method: 'none' });
   });
 });

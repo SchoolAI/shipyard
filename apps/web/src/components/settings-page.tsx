@@ -1,7 +1,12 @@
-import { Button } from '@heroui/react';
+import { Button, Chip } from '@heroui/react';
 import { change, type TypedDoc } from '@loro-extended/change';
 import { useDoc } from '@loro-extended/react';
-import type { TaskIndexDocumentShape, WorktreeScriptValue } from '@shipyard/loro-schema';
+import type {
+  AnthropicLoginResponseEphemeralValue,
+  MachineCapabilitiesEphemeralValue,
+  TaskIndexDocumentShape,
+  WorktreeScriptValue,
+} from '@shipyard/loro-schema';
 import {
   buildDocumentId,
   DEFAULT_EPOCH,
@@ -9,15 +14,30 @@ import {
   ROOM_EPHEMERAL_DECLARATIONS,
   TaskIndexDocumentSchema,
 } from '@shipyard/loro-schema';
-import { ArrowLeft, Plus, Terminal, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle,
+  ExternalLink,
+  Key,
+  Loader2,
+  Monitor,
+  Plus,
+  Terminal,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GitRepoInfo } from '../hooks/use-machine-selection';
+import type { GitRepoInfo, MachineGroup } from '../hooks/use-machine-selection';
+import type { RoomHandle } from '../hooks/use-room-handle';
 import { useRepo } from '../providers/repo-provider';
 import { isWorktreePath } from '../utils/worktree-helpers';
 
 interface SettingsPageProps {
   onBack: () => void;
   availableEnvironments: GitRepoInfo[];
+  machines: MachineGroup[];
+  capabilitiesByMachine: Map<string, MachineCapabilitiesEphemeralValue>;
+  roomHandle: RoomHandle;
 }
 
 function isWorktree(env: GitRepoInfo): boolean {
@@ -29,7 +49,51 @@ function deriveRepoName(repoPath: string): string {
   return segments[segments.length - 1] ?? repoPath;
 }
 
-export function SettingsPage({ onBack, availableEnvironments }: SettingsPageProps) {
+/** Format the auth method for display. */
+function formatAuthMethod(method: string): string {
+  switch (method) {
+    case 'api-key':
+      return 'API Key';
+    case 'oauth':
+      return 'OAuth';
+    case 'none':
+      return 'None';
+    default:
+      return method;
+  }
+}
+
+/** Get display color for auth status chip. */
+function getAuthStatusColor(status: string): 'success' | 'warning' | 'default' {
+  switch (status) {
+    case 'authenticated':
+      return 'success';
+    case 'unauthenticated':
+      return 'warning';
+    default:
+      return 'default';
+  }
+}
+
+/** Get display label for auth status. */
+function getAuthStatusLabel(status: string): string {
+  switch (status) {
+    case 'authenticated':
+      return 'Authenticated';
+    case 'unauthenticated':
+      return 'Not authenticated';
+    default:
+      return 'Unknown';
+  }
+}
+
+export function SettingsPage({
+  onBack,
+  availableEnvironments,
+  machines,
+  capabilitiesByMachine,
+  roomHandle,
+}: SettingsPageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
 
@@ -120,7 +184,13 @@ export function SettingsPage({ onBack, availableEnvironments }: SettingsPageProp
           </h2>
         </div>
 
-        <section aria-labelledby="worktree-scripts-heading">
+        <AnthropicAuthSection
+          machines={machines}
+          capabilitiesByMachine={capabilitiesByMachine}
+          roomHandle={roomHandle}
+        />
+
+        <section aria-labelledby="worktree-scripts-heading" className="mt-8">
           <div className="flex items-center gap-2 mb-4">
             <Terminal className="w-4 h-4 text-muted" aria-hidden="true" />
             <h3 id="worktree-scripts-heading" className="text-base font-medium text-foreground">
@@ -198,6 +268,245 @@ export function SettingsPage({ onBack, availableEnvironments }: SettingsPageProp
       </div>
     </div>
   );
+}
+
+interface AnthropicAuthSectionProps {
+  machines: MachineGroup[];
+  capabilitiesByMachine: Map<string, MachineCapabilitiesEphemeralValue>;
+  roomHandle: RoomHandle;
+}
+
+function AnthropicAuthSection({
+  machines,
+  capabilitiesByMachine,
+  roomHandle,
+}: AnthropicAuthSectionProps) {
+  return (
+    <section aria-labelledby="anthropic-auth-heading">
+      <div className="flex items-center gap-2 mb-4">
+        <Key className="w-4 h-4 text-muted" aria-hidden="true" />
+        <h3 id="anthropic-auth-heading" className="text-base font-medium text-foreground">
+          Anthropic Authentication
+        </h3>
+      </div>
+      <p className="text-sm text-muted mb-4">
+        Manage Anthropic authentication on your connected machines. Each machine can authenticate
+        independently via API key or OAuth.
+      </p>
+
+      {machines.length === 0 ? (
+        <div className="rounded-lg border border-separator bg-surface/50 px-4 py-6 text-center">
+          <Monitor className="w-6 h-6 text-muted mx-auto mb-2" aria-hidden="true" />
+          <p className="text-sm text-muted">No machines connected.</p>
+          <p className="text-xs text-muted mt-1">
+            Connect a machine to manage its Anthropic authentication.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {machines.map((machine) => {
+            const capabilities = capabilitiesByMachine.get(machine.machineId);
+            const auth = capabilities?.anthropicAuth ?? null;
+            return (
+              <MachineAuthCard
+                key={machine.machineId}
+                machineId={machine.machineId}
+                machineName={machine.machineName}
+                auth={auth}
+                roomHandle={roomHandle}
+              />
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface MachineAuthCardProps {
+  machineId: string;
+  machineName: string;
+  auth: MachineCapabilitiesEphemeralValue['anthropicAuth'];
+  roomHandle: RoomHandle;
+}
+
+function MachineAuthCard({ machineId, machineName, auth, roomHandle }: MachineAuthCardProps) {
+  const [loginState, setLoginState] = useState<{
+    requestId: string;
+    status: AnthropicLoginResponseEphemeralValue['status'] | 'pending';
+    loginUrl: string | null;
+    error: string | null;
+  } | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  /** Subscribe to login response ephemeral for the active requestId. */
+  useEffect(() => {
+    if (!loginState?.requestId) return;
+    if (loginState.status === 'done' || loginState.status === 'error') return;
+
+    const unsub = roomHandle.anthropicLoginResps.subscribe(({ key, value }) => {
+      if (key !== loginState.requestId) return;
+      if (!value) return;
+
+      setLoginState((prev) => {
+        if (!prev || prev.requestId !== key) return prev;
+        return {
+          ...prev,
+          status: value.status,
+          loginUrl: value.loginUrl,
+          error: value.error,
+        };
+      });
+    });
+
+    return unsub;
+  }, [roomHandle, loginState?.requestId, loginState?.status]);
+
+  /** Auto-clear success message after a delay. */
+  useEffect(() => {
+    if (loginState?.status !== 'done') return;
+    setShowSuccess(true);
+    const timer = setTimeout(() => {
+      setShowSuccess(false);
+      setLoginState(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [loginState?.status]);
+
+  const handleLogin = useCallback(() => {
+    const requestId = crypto.randomUUID();
+    setLoginState({ requestId, status: 'pending', loginUrl: null, error: null });
+
+    roomHandle.anthropicLoginReqs.set(requestId, {
+      machineId,
+      requestedAt: Date.now(),
+    });
+  }, [machineId, roomHandle]);
+
+  const isAuthenticated = auth?.status === 'authenticated';
+  const isLoginInProgress =
+    loginState !== null && loginState.status !== 'done' && loginState.status !== 'error';
+
+  return (
+    <div className="rounded-lg border border-separator bg-surface/50 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Monitor className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden="true" />
+          <span className="text-sm font-medium text-foreground truncate">{machineName}</span>
+        </div>
+        {auth && (
+          <Chip size="sm" variant="soft" color={getAuthStatusColor(auth.status)}>
+            {getAuthStatusLabel(auth.status)}
+          </Chip>
+        )}
+      </div>
+
+      {auth ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+            <span>
+              Method: <span className="text-foreground">{formatAuthMethod(auth.method)}</span>
+            </span>
+            {auth.email && (
+              <span>
+                Email: <span className="text-foreground">{auth.email}</span>
+              </span>
+            )}
+          </div>
+
+          {!isAuthenticated && !isLoginInProgress && !showSuccess && (
+            <Button variant="ghost" size="sm" onPress={handleLogin} className="text-sm mt-1">
+              <Key className="w-3.5 h-3.5" aria-hidden="true" />
+              Login with Claude
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-muted">Authentication status unknown.</p>
+          {!isLoginInProgress && !showSuccess && (
+            <Button variant="ghost" size="sm" onPress={handleLogin} className="text-sm">
+              <Key className="w-3.5 h-3.5" aria-hidden="true" />
+              Login with Claude
+            </Button>
+          )}
+        </div>
+      )}
+
+      <LoginProgress loginState={loginState} showSuccess={showSuccess} />
+    </div>
+  );
+}
+
+interface LoginProgressProps {
+  loginState: {
+    requestId: string;
+    status: string;
+    loginUrl: string | null;
+    error: string | null;
+  } | null;
+  showSuccess: boolean;
+}
+
+function LoginProgress({ loginState, showSuccess }: LoginProgressProps) {
+  if (!loginState) return null;
+
+  if (showSuccess) {
+    return (
+      <div
+        className="flex items-center gap-2 mt-2 text-sm text-success"
+        role="status"
+        aria-live="polite"
+      >
+        <CheckCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span>Authenticated successfully</span>
+      </div>
+    );
+  }
+
+  if (loginState.status === 'error') {
+    return (
+      <div className="flex items-center gap-2 mt-2 text-sm text-danger" role="alert">
+        <XCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span>{loginState.error ?? 'Login failed'}</span>
+      </div>
+    );
+  }
+
+  if (loginState.status === 'pending' || loginState.status === 'starting') {
+    return (
+      <div
+        className="flex items-center gap-2 mt-2 text-sm text-muted"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden="true" />
+        <span>Starting login...</span>
+      </div>
+    );
+  }
+
+  if (loginState.status === 'waiting' && loginState.loginUrl) {
+    return (
+      <div className="mt-2 space-y-2" role="status" aria-live="polite">
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden="true" />
+          <span>Waiting for authentication...</span>
+        </div>
+        <a
+          href={loginState.loginUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+        >
+          Open login page
+          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+        </a>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 interface ScriptCardProps {

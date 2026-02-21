@@ -83,6 +83,11 @@ const SESSION_STATES = ['pending', 'active', 'completed', 'failed', 'interrupted
 const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
 const PERMISSION_MODES = ['default', 'accept-edits', 'plan', 'bypass'] as const;
 
+const ANTHROPIC_AUTH_STATUSES = ['authenticated', 'unauthenticated', 'unknown'] as const;
+const ANTHROPIC_AUTH_METHODS = ['api-key', 'oauth', 'none'] as const;
+
+const ANTHROPIC_LOGIN_STATUSES = ['starting', 'waiting', 'done', 'error'] as const;
+
 /**
  * Message shape (MCP-aligned).
  * Messages are the units of conversation between user and assistant.
@@ -247,6 +252,9 @@ export type ImageSource = Infer<typeof ImageSourceShape>;
 export type SupportedImageMediaType = (typeof SUPPORTED_IMAGE_MEDIA_TYPES)[number];
 export {
   A2A_TASK_STATES,
+  ANTHROPIC_AUTH_METHODS,
+  ANTHROPIC_AUTH_STATUSES,
+  ANTHROPIC_LOGIN_STATUSES,
   COMMENT_AUTHOR_TYPES,
   CONTENT_BLOCK_TYPES,
   IMAGE_SOURCE_TYPES,
@@ -290,6 +298,9 @@ export const PermissionResponseEphemeral = Shape.plain.struct({
   decidedAt: Shape.plain.number(),
 });
 
+export type AnthropicAuthStatus = (typeof ANTHROPIC_AUTH_STATUSES)[number];
+export type AnthropicAuthMethod = (typeof ANTHROPIC_AUTH_METHODS)[number];
+export type AnthropicLoginStatus = (typeof ANTHROPIC_LOGIN_STATUSES)[number];
 export type ToolRiskLevel = (typeof TOOL_RISK_LEVELS)[number];
 export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 export type PermissionRequest = Infer<typeof PermissionRequestEphemeral>;

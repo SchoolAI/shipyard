@@ -1,5 +1,12 @@
 import { type Infer, type InferMutableType, Shape } from '@loro-extended/change';
-import { A2A_TASK_STATES, PERMISSION_MODES, REASONING_EFFORTS } from './shapes.js';
+import {
+  A2A_TASK_STATES,
+  ANTHROPIC_AUTH_METHODS,
+  ANTHROPIC_AUTH_STATUSES,
+  ANTHROPIC_LOGIN_STATUSES,
+  PERMISSION_MODES,
+  REASONING_EFFORTS,
+} from './shapes.js';
 
 /**
  * Per-entry shape for the task index.
@@ -123,11 +130,22 @@ const GitRepoInfoShape = Shape.plain.struct({
  *
  * Mirrors MachineCapabilitiesSchema from @shipyard/session (Zod).
  */
+/**
+ * Anthropic auth status shape for machine capabilities.
+ * Indicates whether the daemon can authenticate with Anthropic (API key or OAuth).
+ */
+const AnthropicAuthShape = Shape.plain.struct({
+  status: Shape.plain.string(...ANTHROPIC_AUTH_STATUSES),
+  method: Shape.plain.string(...ANTHROPIC_AUTH_METHODS),
+  email: Shape.plain.string().nullable(),
+});
+
 export const MachineCapabilitiesEphemeral = Shape.plain.struct({
   models: Shape.plain.array(ModelInfoShape),
   environments: Shape.plain.array(GitRepoInfoShape),
   permissionModes: Shape.plain.array(Shape.plain.string(...PERMISSION_MODES)),
   homeDir: Shape.plain.string().nullable(),
+  anthropicAuth: AnthropicAuthShape.nullable(),
 });
 
 export type MachineCapabilitiesEphemeralShape = typeof MachineCapabilitiesEphemeral;
@@ -210,6 +228,29 @@ export const WorktreeSetupResultEphemeral = Shape.plain.struct({
 export type WorktreeSetupResultEphemeralValue = Infer<typeof WorktreeSetupResultEphemeral>;
 
 /**
+ * Ephemeral request shape for Anthropic login (keyed by requestId).
+ * Browser writes, daemon reads. Triggers `claude auth login` on the daemon.
+ */
+export const AnthropicLoginRequestEphemeral = Shape.plain.struct({
+  machineId: Shape.plain.string(),
+  requestedAt: Shape.plain.number(),
+});
+
+export type AnthropicLoginRequestEphemeralValue = Infer<typeof AnthropicLoginRequestEphemeral>;
+
+/**
+ * Ephemeral response shape for Anthropic login (keyed by requestId).
+ * Daemon writes progress, browser reads reactively.
+ */
+export const AnthropicLoginResponseEphemeral = Shape.plain.struct({
+  status: Shape.plain.string(...ANTHROPIC_LOGIN_STATUSES),
+  loginUrl: Shape.plain.string().nullable(),
+  error: Shape.plain.string().nullable(),
+});
+
+export type AnthropicLoginResponseEphemeralValue = Infer<typeof AnthropicLoginResponseEphemeral>;
+
+/**
  * Ephemeral declarations for the room/task-index document.
  * Passed as the third argument to `repo.get(docId, schema, ephemeralDeclarations)`.
  */
@@ -220,4 +261,6 @@ export const ROOM_EPHEMERAL_DECLARATIONS = {
   worktreeCreateReqs: WorktreeCreateRequestEphemeral,
   worktreeCreateResps: WorktreeCreateResponseEphemeral,
   worktreeSetupResps: WorktreeSetupResultEphemeral,
+  anthropicLoginReqs: AnthropicLoginRequestEphemeral,
+  anthropicLoginResps: AnthropicLoginResponseEphemeral,
 };

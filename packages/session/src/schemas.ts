@@ -301,6 +301,17 @@ export const PermissionModeSchema = z.enum(['default', 'accept-edits', 'plan', '
 export type PermissionMode = z.infer<typeof PermissionModeSchema>;
 
 /**
+ * Anthropic auth status — detected from API key or Claude Code OAuth.
+ */
+export const AnthropicAuthStatusSchema = z.object({
+  status: z.enum(['authenticated', 'unauthenticated', 'unknown']),
+  method: z.enum(['api-key', 'oauth', 'none']),
+  email: z.string().optional(),
+});
+
+export type AnthropicAuthStatus = z.infer<typeof AnthropicAuthStatusSchema>;
+
+/**
  * Machine capabilities schema — advertised by daemons at registration time.
  */
 export const MachineCapabilitiesSchema = z.object({
@@ -308,6 +319,7 @@ export const MachineCapabilitiesSchema = z.object({
   environments: z.array(GitRepoInfoSchema),
   permissionModes: z.array(PermissionModeSchema),
   homeDir: z.string().optional(),
+  anthropicAuth: AnthropicAuthStatusSchema.optional(),
 });
 
 export type MachineCapabilities = z.infer<typeof MachineCapabilitiesSchema>;
