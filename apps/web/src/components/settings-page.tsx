@@ -1,4 +1,4 @@
-import { Button, Chip, Description, Dropdown, Label } from '@heroui/react';
+import { Button, Chip, Description, Dropdown, Label, Switch } from '@heroui/react';
 import { change, type TypedDoc } from '@loro-extended/change';
 import { useDoc } from '@loro-extended/react';
 import type {
@@ -27,6 +27,7 @@ import {
   Key,
   Loader2,
   Monitor,
+  Moon,
   Plus,
   Settings2,
   Shield,
@@ -124,6 +125,18 @@ export function SettingsPage({
     [worktreeScriptsRecord]
   );
 
+  type KeepAwakeDoc = {
+    userSettings: {
+      keepMachineAwake: boolean;
+    };
+  };
+  /* eslint-disable no-restricted-syntax -- loro-extended generic erasure requires cast */
+  const keepMachineAwake = useDoc(
+    roomDocHandle,
+    (d) => (d as never as KeepAwakeDoc).userSettings.keepMachineAwake
+  );
+  /* eslint-enable no-restricted-syntax */
+
   useEffect(() => {
     containerRef.current?.focus();
   }, []);
@@ -158,6 +171,15 @@ export function SettingsPage({
     (repoPath: string, script: string) => {
       change(typedDoc, (draft) => {
         draft.userSettings.worktreeScripts.set(repoPath, { script });
+      });
+    },
+    [typedDoc]
+  );
+
+  const handleToggleKeepAwake = useCallback(
+    (enabled: boolean) => {
+      change(typedDoc, (draft) => {
+        draft.userSettings.keepMachineAwake = enabled;
       });
     },
     [typedDoc]
@@ -203,6 +225,30 @@ export function SettingsPage({
           roomDocHandle={roomDocHandle}
           capabilitiesByMachine={capabilitiesByMachine}
         />
+
+        <section aria-labelledby="keep-awake-heading" className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Moon className="w-4 h-4 text-muted" aria-hidden="true" />
+            <h3 id="keep-awake-heading" className="text-base font-medium text-foreground">
+              Keep Machine Awake
+            </h3>
+          </div>
+          <p className="text-sm text-muted mb-4">
+            Prevent your machine from sleeping while agent tasks are running.
+          </p>
+          <div className="flex items-center justify-between rounded-lg border border-separator bg-surface/50 px-3 py-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <Moon className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden="true" />
+              <span className="text-sm text-foreground">Prevent idle sleep</span>
+            </div>
+            <Switch
+              isSelected={keepMachineAwake ?? false}
+              onChange={handleToggleKeepAwake}
+              aria-label="Keep machine awake during tasks"
+              size="sm"
+            />
+          </div>
+        </section>
 
         <section aria-labelledby="worktree-scripts-heading" className="mt-8">
           <div className="flex items-center gap-2 mb-4">

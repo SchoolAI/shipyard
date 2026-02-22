@@ -56,6 +56,7 @@ import { recoverOrphanedTask } from './crash-recovery.js';
 import type { Env } from './env.js';
 import { getShipyardHome } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
+import { KeepAwakeManager } from './keep-awake.js';
 import { LifecycleManager } from './lifecycle.js';
 import { createChildLogger, logger } from './logger.js';
 import {
@@ -265,6 +266,7 @@ export async function serve(env: Env): Promise<void> {
     permissions: buildShipyardPermissions('owner'),
   });
 
+  const keepAwakeManager = new KeepAwakeManager(log);
   const terminalPtys = new Map<string, PtyManager>();
 
   const peerManager = createPeerManager({
@@ -540,6 +542,17 @@ export async function serve(env: Env): Promise<void> {
 
   await rehydrateTaskDocuments(roomHandle, typedRoomDoc, repo, log);
 
+  /** Track the keep-awake user setting and react to changes */
+  let keepAwakeEnabled = typedRoomDoc.toJSON().userSettings?.keepMachineAwake ?? false;
+  const keepAwakeUnsub = roomHandle.subscribe(() => {
+    const newValue = typedRoomDoc.toJSON().userSettings?.keepMachineAwake ?? false;
+    if (newValue !== keepAwakeEnabled) {
+      keepAwakeEnabled = newValue;
+      log.info({ keepAwakeEnabled }, 'Keep-awake setting changed');
+      keepAwakeManager.update(keepAwakeEnabled, activeTasks.size > 0);
+    }
+  });
+
   typedRoomHandle.enhancePromptReqs.subscribe(({ key: requestId, value, source }) => {
     if (source !== 'remote') return;
     if (!value) return;
@@ -751,6 +764,8 @@ export async function serve(env: Env): Promise<void> {
       capabilities,
       publishCapabilities,
       branchWatcher,
+      keepAwakeManager,
+      getKeepAwakeEnabled: () => keepAwakeEnabled,
     });
   });
 
@@ -762,6 +777,8 @@ export async function serve(env: Env): Promise<void> {
     log.info('Shutting down serve mode...');
 
     branchWatcher.close();
+    keepAwakeManager.shutdown();
+    keepAwakeUnsub();
 
     for (const task of activeTasks.values()) {
       task.sessionManager.closeSession();
@@ -821,6 +838,8 @@ interface MessageHandlerContext {
   capabilities: MachineCapabilities;
   publishCapabilities: (caps: MachineCapabilities) => void;
   branchWatcher: BranchWatcher;
+  keepAwakeManager: KeepAwakeManager;
+  getKeepAwakeEnabled: () => boolean;
 }
 
 const DIFF_DEBOUNCE_MS = 2_000;
@@ -1995,6 +2014,7 @@ function onTaskDocChanged(
     lastDispatchedConvLen: conversation.length,
   };
   ctx.activeTasks.set(taskId, activeTask);
+  ctx.keepAwakeManager.update(ctx.getKeepAwakeEnabled(), true);
   ctx.lastProcessedConvLen.set(taskId, conversation.length);
 
   ctx.signaling.updateStatus('running', taskId);
@@ -2095,6 +2115,7 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   }
 
   ctx.activeTasks.delete(taskId);
+  ctx.keepAwakeManager.update(ctx.getKeepAwakeEnabled(), ctx.activeTasks.size > 0);
   ctx.signaling.updateStatus('idle');
 
   onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
