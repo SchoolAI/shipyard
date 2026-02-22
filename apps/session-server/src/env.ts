@@ -22,19 +22,11 @@ const BaseEnvSchema = z.object({
   LOG_LEVEL: LogLevelSchema.optional(),
 });
 
-/** Production base URL for the signaling worker */
-const PRODUCTION_BASE_URL = 'https://shipyard-session-server.jacob-191.workers.dev';
-/** Development base URL for the signaling worker */
-const DEVELOPMENT_BASE_URL = 'http://localhost:4444';
-
 /**
  * Environment schema for the signaling worker.
- * Validates env bindings at runtime and computes BASE_URL from ENVIRONMENT.
+ * Validates env bindings at runtime.
  */
-export const EnvSchema = BaseEnvSchema.transform((data) => ({
-  ...data,
-  BASE_URL: data.ENVIRONMENT === 'production' ? PRODUCTION_BASE_URL : DEVELOPMENT_BASE_URL,
-}));
+export const EnvSchema = BaseEnvSchema;
 
 export type Env = z.infer<typeof EnvSchema>;
 

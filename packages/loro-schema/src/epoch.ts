@@ -75,11 +75,18 @@ export function parseEpochParam(searchParams: URLSearchParams): number | null {
 }
 
 /**
+ * Known document ID prefixes.
+ * Every document in Shipyard uses one of these prefixes in its epoch-versioned ID.
+ */
+const DOCUMENT_PREFIXES = ['task-meta', 'task-conv', 'task-review', 'room', 'epoch'] as const;
+export type DocumentPrefix = (typeof DOCUMENT_PREFIXES)[number];
+
+/**
  * Build an epoch-versioned document ID.
  * Pattern: "{prefix}:{key}:{epoch}"
- * Example: buildDocumentId('task', 'abc123', 2) → "task:abc123:2"
+ * Example: buildDocumentId('task-meta', 'abc123', 2) → "task-meta:abc123:2"
  */
-export function buildDocumentId(prefix: string, key: string, epoch: number): string {
+export function buildDocumentId(prefix: DocumentPrefix, key: string, epoch: number): string {
   if (!prefix || !key) {
     throw new Error(
       `Document ID prefix and key must be non-empty: prefix="${prefix}", key="${key}"`
@@ -109,16 +116,25 @@ export function buildTaskReviewDocId(taskId: string, epoch: number): string {
   return buildDocumentId('task-review', taskId, epoch);
 }
 
+const DOCUMENT_PREFIX_SET: ReadonlySet<string> = new Set(DOCUMENT_PREFIXES);
+
+function isDocumentPrefix(value: string): value is DocumentPrefix {
+  return DOCUMENT_PREFIX_SET.has(value);
+}
+
 /**
  * Parse an epoch-versioned document ID.
- * Returns null if the format is invalid.
+ * Returns null if the format is invalid or the prefix is not a known DocumentPrefix.
  */
-export function parseDocumentId(id: string): { prefix: string; key: string; epoch: number } | null {
+export function parseDocumentId(
+  id: string
+): { prefix: DocumentPrefix; key: string; epoch: number } | null {
   const parts = id.split(':');
   if (parts.length !== 3) return null;
 
   const [prefix, key, epochStr] = parts;
   if (!prefix || !key || !epochStr) return null;
+  if (!isDocumentPrefix(prefix)) return null;
 
   const epoch = Number.parseInt(epochStr, 10);
   if (!Number.isFinite(epoch) || epoch < 1) return null;

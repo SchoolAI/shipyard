@@ -35,6 +35,7 @@ function defaultCallbacks() {
     onShowShortcuts: vi.fn(),
     onToggleVoiceInput: vi.fn(),
     onStopAgent: vi.fn(),
+    onShare: vi.fn(),
   };
 }
 

@@ -1,4 +1,12 @@
-import { GitCompareArrows, Keyboard, PanelLeftClose, Plus, Settings, Terminal } from 'lucide-react';
+import {
+  GitCompareArrows,
+  Keyboard,
+  PanelLeftClose,
+  Plus,
+  Settings,
+  Share2,
+  Terminal,
+} from 'lucide-react';
 import { HOTKEYS } from '../../../constants/hotkeys';
 import { useTaskStore } from '../../../stores/task-store';
 import { useUIStore } from '../../../stores/ui-store';
@@ -79,6 +87,20 @@ const ACTIONS: ActionDef[] = [
     shortcut: HOTKEYS.showShortcutsAlt.display,
     onSelect: (close) => {
       useUIStore.getState().setShortcutsModalOpen(true);
+      close();
+    },
+  },
+  {
+    id: 'action:share-task',
+    label: 'Share Task',
+    icon: Share2,
+    keywords: ['share', 'invite', 'collaborate', 'link'],
+    shortcut: HOTKEYS.share.display,
+    onSelect: (close) => {
+      const taskId = useTaskStore.getState().activeTaskId;
+      if (taskId) {
+        useUIStore.getState().setShareModalOpen(true);
+      }
       close();
     },
   },

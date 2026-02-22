@@ -806,6 +806,8 @@ export class SessionManager {
           reasoningEffort: null,
           permissionMode: null,
           cwd: null,
+          authorId: 'agent',
+          authorName: this.#currentModel,
         });
       });
     }
@@ -842,6 +844,8 @@ export class SessionManager {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: 'agent',
+        authorName: this.#currentModel,
       });
     });
     change(this.#metaDoc, (draft) => {

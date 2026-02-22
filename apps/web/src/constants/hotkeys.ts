@@ -132,4 +132,11 @@ export const HOTKEYS = {
     description: 'Stop the currently running agent',
     context: 'global',
   },
+  share: {
+    key: 'meta+shift+s',
+    label: 'Share Task',
+    display: '\u2318\u21E7S',
+    description: 'Open the share dialog for the active task',
+    context: 'global',
+  },
 } as const satisfies Record<string, HotkeyDef>;

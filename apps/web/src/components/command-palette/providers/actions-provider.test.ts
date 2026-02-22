@@ -15,11 +15,11 @@ describe('createActionsProvider', () => {
     provider = createActionsProvider(close);
   });
 
-  it('returns all 6 actions when query is empty', () => {
+  it('returns all 7 actions when query is empty', () => {
     const context: CommandContext = { activeTaskId: null, query: '' };
     const items = provider(context);
 
-    expect(items).toHaveLength(6);
+    expect(items).toHaveLength(7);
     for (const item of items) {
       expect(item.kind).toBe('action');
       expect(item.group).toBe('Actions');

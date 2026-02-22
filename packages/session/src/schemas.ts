@@ -133,6 +133,16 @@ export const AuthVerifyResponseSchema = z.discriminatedUnion('valid', [
 export type AuthVerifyResponse = z.infer<typeof AuthVerifyResponseSchema>;
 
 /**
+ * Granular collaborator roles for shared task sessions.
+ */
+export const CollaboratorRoleSchema = z.enum([
+  'collaborator-full',
+  'collaborator-review',
+  'viewer',
+]);
+export type CollaboratorRole = z.infer<typeof CollaboratorRoleSchema>;
+
+/**
  * POST /collab/create request body schema.
  *
  * Used to create a new collaboration room with a pre-signed URL.
@@ -142,6 +152,8 @@ export const CollabCreateRequestSchema = z.object({
   taskId: z.string().min(1, 'taskId is required'),
   /** How long the collaboration link should be valid (1-1440 minutes, default 60) */
   expiresInMinutes: z.number().min(1).max(1440).default(60),
+  /** Permission level for the invitee (defaults to 'collaborator-full') */
+  role: CollaboratorRoleSchema.optional(),
 });
 
 export type CollabCreateRequest = z.infer<typeof CollabCreateRequestSchema>;
@@ -251,6 +263,8 @@ export const PresignedUrlPayloadSchema = z.object({
   inviterId: z.string(),
   /** Expiration timestamp (Unix ms) */
   exp: z.number(),
+  /** Permission level for the invitee (defaults to 'collaborator-full') */
+  role: CollaboratorRoleSchema.optional(),
 });
 
 export type PresignedUrlPayload = z.infer<typeof PresignedUrlPayloadSchema>;
@@ -715,8 +729,11 @@ export type CollabRoomClientMessage = z.infer<typeof CollabRoomClientMessageSche
 export const ParticipantSchema = z.object({
   userId: z.string(),
   username: z.string(),
-  role: z.enum(['owner', 'collaborator']),
+  avatarUrl: z.string().nullable().optional(),
+  role: z.enum(['owner', 'collaborator-full', 'collaborator-review', 'viewer']),
 });
+
+export type Participant = z.infer<typeof ParticipantSchema>;
 
 /**
  * Authentication success message schema for collab room WebSocket.

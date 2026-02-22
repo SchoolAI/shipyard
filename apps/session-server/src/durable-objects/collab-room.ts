@@ -28,7 +28,8 @@ interface ConnectionState {
   id: string;
   userId: string;
   username: string;
-  role: 'owner' | 'collaborator';
+  role: 'owner' | 'collaborator-full' | 'collaborator-review' | 'viewer';
+  avatarUrl: string | null;
 }
 
 export class CollabRoom extends DurableObject<Env> {
@@ -72,6 +73,7 @@ export class CollabRoom extends DurableObject<Env> {
           userId: attachment.userId,
           username: attachment.username,
           role: attachment.role,
+          avatarUrl: attachment.avatarUrl ?? null,
         });
       }
     }
@@ -121,9 +123,13 @@ export class CollabRoom extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(payload.exp);
     }
 
-    const userId = payload.userClaims?.sub ?? payload.inviterId;
-    const username = payload.userClaims?.displayName ?? 'anonymous';
-    const role: 'owner' | 'collaborator' = userId === this.ownerId ? 'owner' : 'collaborator';
+    if (!payload.userClaims) {
+      return new Response('Authentication required', { status: 401 });
+    }
+    const userId = payload.userClaims.sub;
+    const username = payload.userClaims.displayName;
+    const role =
+      userId === this.ownerId ? ('owner' as const) : (payload.role ?? 'collaborator-full');
 
     const pair = new WebSocketPair();
     const values = Object.values(pair);
@@ -138,6 +144,7 @@ export class CollabRoom extends DurableObject<Env> {
       userId,
       username,
       role,
+      avatarUrl: payload.userClaims?.avatarUrl ?? null,
     };
 
     this.ctx.acceptWebSocket(server);
@@ -157,6 +164,7 @@ export class CollabRoom extends DurableObject<Env> {
         userId: p.userId,
         username: p.username,
         role: p.role,
+        avatarUrl: p.avatarUrl,
       })),
     });
 
@@ -164,7 +172,7 @@ export class CollabRoom extends DurableObject<Env> {
       this.participants,
       {
         type: 'participant-joined',
-        participant: { userId, username, role },
+        participant: { userId, username, role, avatarUrl: state.avatarUrl },
       } satisfies CollabRoomServerMessage,
       server
     );
@@ -322,6 +330,7 @@ export class CollabRoom extends DurableObject<Env> {
       userId: state.userId,
       username: state.username,
       role: state.role,
+      avatarUrl: state.avatarUrl,
     };
     ws.serializeAttachment(serialized);
   }
@@ -336,7 +345,8 @@ export class CollabRoom extends DurableObject<Env> {
       'username' in obj &&
       typeof obj.username === 'string' &&
       'role' in obj &&
-      (obj.role === 'owner' || obj.role === 'collaborator')
+      typeof obj.role === 'string' &&
+      ['owner', 'collaborator-full', 'collaborator-review', 'viewer'].includes(obj.role)
     );
   }
 }

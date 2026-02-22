@@ -45,6 +45,8 @@ describe('epoch evolution', () => {
           reasoningEffort: null,
           permissionMode: null,
           cwd: null,
+          authorId: null,
+          authorName: null,
         });
         draft.conversation.push({
           messageId: 'msg-e1-2',
@@ -56,6 +58,8 @@ describe('epoch evolution', () => {
           reasoningEffort: null,
           permissionMode: null,
           cwd: null,
+          authorId: null,
+          authorName: null,
         });
       });
 
@@ -249,6 +253,8 @@ describe('epoch evolution', () => {
           reasoningEffort: null,
           permissionMode: null,
           cwd: null,
+          authorId: null,
+          authorName: null,
         });
       });
 
@@ -263,6 +269,8 @@ describe('epoch evolution', () => {
           reasoningEffort: null,
           permissionMode: null,
           cwd: null,
+          authorId: null,
+          authorName: null,
         });
       });
       change(metaDocE1, (draft) => {

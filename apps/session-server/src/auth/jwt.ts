@@ -14,6 +14,7 @@ const ShipyardJWTClaimsSchema = z.object({
   sub: z.string(),
   displayName: z.string(),
   providers: z.array(z.string()),
+  avatarUrl: z.string().nullish(),
   iat: z.number(),
   exp: z.number(),
   scope: z.string().optional(),
@@ -30,7 +31,7 @@ const AGENT_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
  * Generate a session JWT for browser/CLI use.
  */
 export async function generateSessionToken(
-  user: { id: string; displayName: string },
+  user: { id: string; displayName: string; avatarUrl?: string | null },
   providers: string[],
   secret: string,
   environment: string
@@ -41,6 +42,7 @@ export async function generateSessionToken(
     sub: user.id,
     displayName: user.displayName,
     providers,
+    avatarUrl: user.avatarUrl ?? null,
     iat: now,
     exp: now + Math.floor(SESSION_TOKEN_EXPIRY_MS / 1000),
   };

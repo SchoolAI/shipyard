@@ -17,6 +17,7 @@ interface AppHotkeyOptions {
   onShowShortcuts: () => void;
   onToggleVoiceInput: () => void;
   onStopAgent: () => void;
+  onShare: () => void;
 }
 
 const GLOBAL_OPTIONS = { preventDefault: true, enableOnFormTags: true } as const;
@@ -35,6 +36,7 @@ export function useAppHotkeys({
   onShowShortcuts,
   onToggleVoiceInput,
   onStopAgent,
+  onShare,
 }: AppHotkeyOptions) {
   const isOverlayOpen = useUIStore(
     (s) => s.isCommandPaletteOpen || s.isShortcutsModalOpen || s.isSettingsOpen
@@ -92,4 +94,6 @@ export function useAppHotkeys({
   useHotkeys(HOTKEYS.voiceInput.key, onToggleVoiceInput, GLOBAL_OPTIONS, [onToggleVoiceInput]);
 
   useHotkeys(HOTKEYS.stopAgent.key, onStopAgent, stopAgentOptions, [onStopAgent, isOverlayOpen]);
+
+  useHotkeys(HOTKEYS.share.key, onShare, GLOBAL_OPTIONS, [onShare]);
 }

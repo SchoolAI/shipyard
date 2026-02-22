@@ -18,6 +18,7 @@
  * @module
  */
 
+export * from './collab-room-connection';
 export * from './personal-room-connection';
 export * from './routes';
 export * from './schemas';
