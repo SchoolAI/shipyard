@@ -114,6 +114,8 @@ export type {
   TaskMetaDocumentShape,
   TaskReviewDocument,
   TaskReviewDocumentShape,
+  TodoItem,
+  TodoItemStatus,
   ToolRiskLevel,
 } from './shapes.js';
 export {
@@ -147,5 +149,8 @@ export {
   TaskMetaDocumentSchema,
   TaskReviewDocumentSchema,
   TERMINAL_TASK_STATES,
+  TODO_ITEM_STATUSES,
   TOOL_RISK_LEVELS,
+  TodoItemShape,
 } from './shapes.js';
+export { extractTodoDiff, extractTodoItems, type RawTodoItem } from './todo-helpers.js';

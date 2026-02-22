@@ -1,10 +1,13 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
+import type { TodoItem } from '@shipyard/loro-schema';
 import { LOCAL_USER_ID } from '@shipyard/loro-schema';
 import { PanelRight, Terminal } from 'lucide-react';
+import { useMemo } from 'react';
 import { HOTKEYS } from '../constants/hotkeys';
 import { useTaskIndex } from '../hooks/use-task-index';
-import { useTaskStore } from '../stores';
+import { useTaskStore, useUIStore } from '../stores';
 import { formatCostUsd } from '../utils/format-cost';
+import { ProgressRing } from './progress-ring';
 import { MobileSidebarToggle } from './sidebar';
 
 interface TopBarProps {
@@ -12,6 +15,7 @@ interface TopBarProps {
   onToggleSidePanel: () => void;
   hasUnviewedDiff?: boolean;
   totalCostUsd?: number | null;
+  todoItems?: TodoItem[];
 }
 
 export function TopBar({
@@ -19,11 +23,16 @@ export function TopBar({
   onToggleSidePanel,
   hasUnviewedDiff,
   totalCostUsd,
+  todoItems = [],
 }: TopBarProps) {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const activeEntry = activeTaskId ? taskIndex[activeTaskId] : undefined;
   const formattedCost = formatCostUsd(totalCostUsd);
+  const completedCount = useMemo(
+    () => todoItems.filter((t) => t.status === 'completed').length,
+    [todoItems]
+  );
 
   return (
     <header className="flex items-center justify-between px-4 py-1.5 border-b border-separator/50 h-10">
@@ -46,6 +55,19 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-1">
+        {todoItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => useUIStore.getState().setActiveSidePanel('tasks')}
+            className="inline-flex items-center gap-1.5 text-xs font-mono text-muted hover:text-foreground transition-colors px-1.5"
+            aria-label={`Task progress: ${completedCount} of ${todoItems.length}`}
+          >
+            <ProgressRing completed={completedCount} total={todoItems.length} size={16} />
+            <span>
+              {completedCount}/{todoItems.length}
+            </span>
+          </button>
+        )}
         <Tooltip>
           <Tooltip.Trigger>
             <Button

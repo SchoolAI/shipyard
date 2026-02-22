@@ -1,5 +1,5 @@
 import type { ContentBlock } from '@shipyard/loro-schema';
-import { extractPlanMarkdown } from '@shipyard/loro-schema';
+import { extractPlanMarkdown, extractTodoItems, type RawTodoItem } from '@shipyard/loro-schema';
 import { assertNever } from './assert-never';
 
 type ToolUseBlock = ContentBlock & { type: 'tool_use' };
@@ -85,6 +85,12 @@ export type GroupedBlock =
       toolUse: ToolUseBlock;
       toolResult: ToolResultBlock | null;
       questions: ParsedQuestions;
+    }
+  | {
+      kind: 'todo_write';
+      toolUse: ToolUseBlock;
+      toolResult: ToolResultBlock | null;
+      todos: RawTodoItem[];
     };
 
 /**
@@ -210,6 +216,15 @@ function groupToolUse(
       toolUse: block,
       toolResult: result,
       questions: extractQuestions(block.input),
+    };
+  }
+
+  if (block.toolName === 'TodoWrite') {
+    return {
+      kind: 'todo_write',
+      toolUse: block,
+      toolResult: result,
+      todos: extractTodoItems(block.input),
     };
   }
 

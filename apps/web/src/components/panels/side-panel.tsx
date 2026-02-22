@@ -1,7 +1,7 @@
 export type { SidePanelHandle, SidePanelProps };
 export { SidePanel };
 
-import { ClipboardList, GitCompareArrows, X } from 'lucide-react';
+import { ClipboardList, GitCompareArrows, ListChecks, X } from 'lucide-react';
 import {
   type CSSProperties,
   forwardRef,
@@ -29,6 +29,7 @@ interface SidePanelHandle {
 
 interface SidePanelProps {
   children: ReactNode;
+  hasUnviewedTasks?: boolean;
 }
 
 function ToolbarSlot() {
@@ -44,6 +45,7 @@ interface TabDefinition {
 
 const TABS: TabDefinition[] = [
   { id: 'plan', label: 'Plan', icon: ClipboardList },
+  { id: 'tasks', label: 'Tasks', icon: ListChecks },
   { id: 'diff', label: 'Diff', icon: GitCompareArrows },
 ];
 
@@ -76,7 +78,7 @@ function getAsideClassName(isMobile: boolean, isOpen: boolean, isDragging: boole
 }
 
 const SidePanel = forwardRef<SidePanelHandle, SidePanelProps>(function SidePanel(
-  { children },
+  { children, hasUnviewedTasks },
   ref
 ) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -188,6 +190,13 @@ const SidePanel = forwardRef<SidePanelHandle, SidePanelProps>(function SidePanel
                     >
                       <Icon className="w-3.5 h-3.5" />
                       {tab.label}
+                      {tab.id === 'tasks' && hasUnviewedTasks && !isActive && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-secondary"
+                          role="status"
+                          aria-label="New task updates"
+                        />
+                      )}
                     </button>
                   );
                 })}

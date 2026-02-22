@@ -15,6 +15,7 @@ import { change, getLoroDoc } from '@loro-extended/change';
 import type {
   A2ATaskState,
   ContentBlock,
+  RawTodoItem,
   SessionState,
   SupportedImageMediaType,
   TaskConversationDocumentShape,
@@ -22,11 +23,40 @@ import type {
   TaskMetaDocumentShape,
   TaskReviewDocumentShape,
 } from '@shipyard/loro-schema';
-import { extractPlanMarkdown, SUPPORTED_IMAGE_MEDIA_TYPES } from '@shipyard/loro-schema';
+import {
+  extractPlanMarkdown,
+  extractTodoItems,
+  SUPPORTED_IMAGE_MEDIA_TYPES,
+} from '@shipyard/loro-schema';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 import { initPlanEditorDoc } from './plan-editor/index.js';
 import { StreamingInputController } from './streaming-input-controller.js';
+
+function enrichTodoTimestamps(
+  raw: RawTodoItem,
+  existing: { startedAt: number | null; completedAt: number | null } | undefined,
+  now: number
+) {
+  let startedAt: number | null = existing?.startedAt ?? null;
+  let completedAt: number | null = existing?.completedAt ?? null;
+
+  if (raw.status === 'in_progress' && !startedAt) {
+    startedAt = now;
+  }
+  if (raw.status === 'completed') {
+    if (!startedAt) startedAt = now;
+    if (!completedAt) completedAt = now;
+  }
+
+  return {
+    content: raw.content,
+    status: raw.status,
+    activeForm: raw.activeForm,
+    startedAt,
+    completedAt,
+  };
+}
 
 export const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 export const IDLE_CHECK_INTERVAL_MS = 30_000;
@@ -819,6 +849,7 @@ export class SessionManager {
     });
 
     this.#extractPlansFromBlocks(contentBlocks);
+    this.#extractTodosFromBlocks(contentBlocks);
   }
 
   /**
@@ -872,6 +903,40 @@ export class SessionManager {
       logger.info(
         { toolUseId: block.toolUseId, planId },
         'Extracted plan from ExitPlanMode tool call'
+      );
+    }
+  }
+
+  #extractTodosFromBlocks(blocks: ContentBlock[]): void {
+    for (const block of blocks) {
+      if (block.type !== 'tool_use' || block.toolName !== 'TodoWrite') continue;
+
+      const rawTodos = extractTodoItems(block.input);
+      if (rawTodos.length === 0) {
+        logger.warn({ toolUseId: block.toolUseId }, 'Failed to parse TodoWrite tool input');
+        continue;
+      }
+
+      const existingItems = this.#reviewDoc.toJSON().todoItems ?? [];
+      const existingByContent = new Map(existingItems.map((item) => [item.content, item]));
+
+      const now = Date.now();
+      const enrichedItems = rawTodos.map((raw) =>
+        enrichTodoTimestamps(raw, existingByContent.get(raw.content), now)
+      );
+
+      change(this.#reviewDoc, (draft) => {
+        if (draft.todoItems.length > 0) {
+          draft.todoItems.delete(0, draft.todoItems.length);
+        }
+        for (const item of enrichedItems) {
+          draft.todoItems.push(item);
+        }
+      });
+
+      logger.info(
+        { toolUseId: block.toolUseId, count: enrichedItems.length },
+        'Updated todoItems from TodoWrite tool call'
       );
     }
   }

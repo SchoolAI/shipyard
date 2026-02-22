@@ -409,4 +409,122 @@ describe('groupContentBlocks', () => {
     expect(q.toolResult).toBeNull();
     expect(q.questions).toHaveLength(1);
   });
+
+  describe('TodoWrite grouping', () => {
+    it('groups TodoWrite tool_use as todo_write kind', () => {
+      const input = JSON.stringify({
+        todos: [{ content: 'Write tests', status: 'pending', activeForm: 'Writing tests' }],
+      });
+      const blocks: ContentBlock[] = [
+        {
+          type: 'tool_use',
+          toolUseId: 'tw-1',
+          toolName: 'TodoWrite',
+          input,
+          parentToolUseId: null,
+        },
+      ];
+      const grouped = groupContentBlocks(blocks);
+      expect(grouped).toHaveLength(1);
+      expect(grouped[0]?.kind).toBe('todo_write');
+
+      const tw = grouped[0] as GroupedBlock & { kind: 'todo_write' };
+      expect(tw.todos).toHaveLength(1);
+      expect(tw.todos[0]?.content).toBe('Write tests');
+      expect(tw.todos[0]?.status).toBe('pending');
+      expect(tw.todos[0]?.activeForm).toBe('Writing tests');
+    });
+
+    it('extracts todos from valid input', () => {
+      const input = JSON.stringify({
+        todos: [
+          { content: 'Write tests', status: 'pending', activeForm: 'Writing tests' },
+          { content: 'Fix bug', status: 'in_progress', activeForm: 'Fixing bug' },
+          { content: 'Deploy', status: 'completed', activeForm: 'Deploying' },
+        ],
+      });
+      const blocks: ContentBlock[] = [
+        {
+          type: 'tool_use',
+          toolUseId: 'tw-2',
+          toolName: 'TodoWrite',
+          input,
+          parentToolUseId: null,
+        },
+      ];
+      const grouped = groupContentBlocks(blocks);
+      const tw = grouped[0] as GroupedBlock & { kind: 'todo_write' };
+      expect(tw.todos).toHaveLength(3);
+      expect(tw.todos[0]?.content).toBe('Write tests');
+      expect(tw.todos[1]?.content).toBe('Fix bug');
+      expect(tw.todos[2]?.content).toBe('Deploy');
+    });
+
+    it('handles malformed TodoWrite input', () => {
+      const blocks: ContentBlock[] = [
+        {
+          type: 'tool_use',
+          toolUseId: 'tw-3',
+          toolName: 'TodoWrite',
+          input: 'not-json',
+          parentToolUseId: null,
+        },
+      ];
+      const grouped = groupContentBlocks(blocks);
+      expect(grouped).toHaveLength(1);
+      expect(grouped[0]?.kind).toBe('todo_write');
+
+      const tw = grouped[0] as GroupedBlock & { kind: 'todo_write' };
+      expect(tw.todos).toHaveLength(0);
+    });
+
+    it('pairs TodoWrite with tool_result correctly', () => {
+      const input = JSON.stringify({
+        todos: [{ content: 'Write tests', status: 'pending', activeForm: 'Writing tests' }],
+      });
+      const blocks: ContentBlock[] = [
+        {
+          type: 'tool_use',
+          toolUseId: 'tw-4',
+          toolName: 'TodoWrite',
+          input,
+          parentToolUseId: null,
+        },
+        toolResult('tw-4', 'Todos updated'),
+      ];
+      const grouped = groupContentBlocks(blocks);
+      expect(grouped).toHaveLength(1);
+      expect(grouped[0]?.kind).toBe('todo_write');
+
+      const tw = grouped[0] as GroupedBlock & { kind: 'todo_write' };
+      expect(tw.toolUse.toolUseId).toBe('tw-4');
+      expect(tw.toolResult?.content).toBe('Todos updated');
+      expect(tw.todos).toHaveLength(1);
+    });
+
+    it('TodoWrite breaks tool_call_group', () => {
+      const todoInput = JSON.stringify({
+        todos: [{ content: 'Write tests', status: 'pending', activeForm: 'Writing tests' }],
+      });
+      const blocks: ContentBlock[] = [
+        toolUse('tu-1', 'Bash'),
+        toolResult('tu-1', 'ok'),
+        {
+          type: 'tool_use',
+          toolUseId: 'tw-5',
+          toolName: 'TodoWrite',
+          input: todoInput,
+          parentToolUseId: null,
+        },
+        toolResult('tw-5', 'Todos updated'),
+        toolUse('tu-2', 'Bash'),
+        toolResult('tu-2', 'ok'),
+      ];
+      const grouped = groupContentBlocks(blocks);
+      expect(grouped).toHaveLength(3);
+      expect(grouped[0]?.kind).toBe('tool_invocation');
+      expect(grouped[1]?.kind).toBe('todo_write');
+      expect(grouped[2]?.kind).toBe('tool_invocation');
+    });
+  });
 });

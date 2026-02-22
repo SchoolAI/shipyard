@@ -4,7 +4,7 @@ import { devtools, persist } from 'zustand/middleware';
 export type Theme = 'dark' | 'light' | 'system';
 export type DiffScope = 'working-tree' | 'branch' | 'last-turn';
 export type DiffViewType = 'split' | 'unified';
-export type SidePanelId = 'diff' | 'plan' | 'deliverables';
+export type SidePanelId = 'diff' | 'plan' | 'tasks' | 'deliverables';
 
 export interface UIStore {
   isSidebarExpanded: boolean;
@@ -32,6 +32,7 @@ export interface UIStore {
   diffScope: DiffScope;
   diffViewType: DiffViewType;
   diffLastViewedAt: number;
+  tasksLastViewedAt: number;
   isDiffFileTreeOpen: boolean;
   diffFileTreeWidth: number;
   showResolvedComments: boolean;
@@ -72,6 +73,7 @@ export interface UIStore {
   setDiffScope: (scope: DiffScope) => void;
   setDiffViewType: (type: DiffViewType) => void;
   setDiffLastViewedAt: (ts: number) => void;
+  setTasksLastViewedAt: (ts: number) => void;
   setDiffFileTreeOpen: (open: boolean) => void;
   toggleDiffFileTree: () => void;
   setDiffFileTreeWidth: (width: number) => void;
@@ -107,6 +109,7 @@ export const useUIStore = create<UIStore>()(
         diffScope: 'working-tree',
         diffViewType: 'unified',
         diffLastViewedAt: 0,
+        tasksLastViewedAt: 0,
         isDiffFileTreeOpen: true,
         diffFileTreeWidth: 220,
         showResolvedComments: false,
@@ -221,6 +224,9 @@ export const useUIStore = create<UIStore>()(
         setDiffLastViewedAt: (ts) =>
           set({ diffLastViewedAt: ts }, undefined, 'ui/setDiffLastViewedAt'),
 
+        setTasksLastViewedAt: (ts) =>
+          set({ tasksLastViewedAt: ts }, undefined, 'ui/setTasksLastViewedAt'),
+
         setDiffFileTreeOpen: (open) =>
           set({ isDiffFileTreeOpen: open }, undefined, 'ui/setDiffFileTreeOpen'),
 
@@ -284,6 +290,7 @@ export const useUIStore = create<UIStore>()(
           diffScope: state.diffScope,
           diffViewType: state.diffViewType,
           diffLastViewedAt: state.diffLastViewedAt,
+          tasksLastViewedAt: state.tasksLastViewedAt,
           isDiffFileTreeOpen: state.isDiffFileTreeOpen,
           diffFileTreeWidth: state.diffFileTreeWidth,
           showResolvedComments: state.showResolvedComments,

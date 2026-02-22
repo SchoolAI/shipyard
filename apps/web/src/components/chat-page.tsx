@@ -67,6 +67,7 @@ import { DiffPanelContent } from './panels/diff-panel';
 import { PlanPanelContent } from './panels/plan-panel';
 import type { SidePanelHandle } from './panels/side-panel';
 import { SidePanel } from './panels/side-panel';
+import { TasksPanelContent } from './panels/tasks-panel';
 import type { TerminalPanelHandle } from './panels/terminal-panel';
 import { TerminalPanel } from './panels/terminal-panel';
 import { PermissionCard } from './permission-card';
@@ -473,6 +474,7 @@ function ChatPageInner() {
     deliveredCommentIds,
     markCommentsDelivered,
     sessions,
+    todoItems,
   } = loroTask;
 
   const totalCostUsd = useMemo(() => {
@@ -505,6 +507,8 @@ function ChatPageInner() {
 
   const diffLastViewedAt = useUIStore((s) => s.diffLastViewedAt);
   const setDiffLastViewedAt = useUIStore((s) => s.setDiffLastViewedAt);
+  const tasksLastViewedAt = useUIStore((s) => s.tasksLastViewedAt);
+  const setTasksLastViewedAt = useUIStore((s) => s.setTasksLastViewedAt);
   const diffScope = useUIStore((s) => s.diffScope);
 
   const taskStatus = loroTask.meta?.status;
@@ -972,6 +976,10 @@ function ChatPageInner() {
   }, [activeSidePanel, setDiffLastViewedAt]);
 
   useEffect(() => {
+    if (activeSidePanel === 'tasks') setTasksLastViewedAt(Date.now());
+  }, [activeSidePanel, setTasksLastViewedAt]);
+
+  useEffect(() => {
     if (activeSidePanel !== null && typeof window !== 'undefined' && window.innerWidth < 1280) {
       setSidebarExpanded(false);
     }
@@ -1397,6 +1405,16 @@ function ChatPageInner() {
     return relevantUpdatedAt > diffLastViewedAt;
   }, [activeSidePanel, loroTask.diffState, diffScope, diffLastViewedAt]);
 
+  const hasUnviewedTasks = useMemo(() => {
+    if (activeSidePanel === 'tasks') return false;
+    if (todoItems.length === 0) return false;
+    const latestUpdate = todoItems.reduce((max, item) => {
+      const ts = item.completedAt ?? item.startedAt ?? 0;
+      return ts > max ? ts : max;
+    }, 0);
+    return latestUpdate > tasksLastViewedAt;
+  }, [activeSidePanel, todoItems, tasksLastViewedAt]);
+
   const canSubmit =
     !!selectedMachineId &&
     connectionState === 'connected' &&
@@ -1442,6 +1460,7 @@ function ChatPageInner() {
             onToggleSidePanel={useCallback(() => toggleSidePanel('diff'), [toggleSidePanel])}
             hasUnviewedDiff={hasUnviewedDiff}
             totalCostUsd={totalCostUsd}
+            todoItems={todoItems}
           />
 
           <main id="main-content" className="flex flex-col flex-1 min-h-0">
@@ -1656,12 +1675,15 @@ function ChatPageInner() {
           composerPermission={composerPermission}
           markCommentsDelivered={markCommentsDelivered}
         >
-          <SidePanel ref={sidePanelRef}>
+          <SidePanel ref={sidePanelRef} hasUnviewedTasks={hasUnviewedTasks}>
             <div className={activeSidePanel === 'diff' ? 'contents' : 'hidden'}>
               <DiffPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
             </div>
             <div className={activeSidePanel === 'plan' ? 'contents' : 'hidden'}>
               <PlanPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
+            </div>
+            <div className={activeSidePanel === 'tasks' ? 'contents' : 'hidden'}>
+              <TasksPanelContent todoItems={todoItems} sessions={sessions} />
             </div>
           </SidePanel>
         </FeedbackProvider>

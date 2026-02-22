@@ -8,6 +8,7 @@ import {
   TaskReviewDocumentSchema,
 } from '@shipyard/loro-schema';
 import { isContainer } from 'loro-crdt';
+import { nanoid } from 'nanoid';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManager } from './session-manager.js';
 
@@ -2328,6 +2329,288 @@ describe('SessionManager', () => {
 
       const reviewJson = taskDocs.review.toJSON();
       expect(reviewJson.plans).toHaveLength(1);
+    });
+  });
+
+  describe('TodoWrite extraction', () => {
+    function assistantMsgWithTodoWrite(todos: Array<Record<string, unknown>>) {
+      return {
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: `todo-${nanoid()}`,
+              name: 'TodoWrite',
+              input: { todos },
+            },
+          ],
+        },
+        parent_tool_use_id: null,
+        uuid: '00000000-0000-0000-0000-000000000040',
+        session_id: 'sess-1',
+      };
+    }
+
+    it('extracts todos from TodoWrite tool call', async () => {
+      const todos = [
+        { content: 'Set up project', status: 'completed', activeForm: 'Setting up project' },
+        { content: 'Write tests', status: 'in_progress', activeForm: 'Writing tests' },
+        { content: 'Deploy', status: 'pending', activeForm: 'Deploying' },
+      ];
+
+      mockQuery.mockReturnValue(
+        mockQueryResponse([initMsg('sess-todo'), assistantMsgWithTodoWrite(todos), successResult()])
+      );
+
+      await manager.createSession({ prompt: 'Do the work', cwd: '/tmp' });
+
+      const reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems).toHaveLength(3);
+      expect(reviewJson.todoItems[0]?.content).toBe('Set up project');
+      expect(reviewJson.todoItems[0]?.status).toBe('completed');
+      expect(reviewJson.todoItems[0]?.activeForm).toBe('Setting up project');
+      expect(reviewJson.todoItems[1]?.content).toBe('Write tests');
+      expect(reviewJson.todoItems[1]?.status).toBe('in_progress');
+      expect(reviewJson.todoItems[2]?.content).toBe('Deploy');
+      expect(reviewJson.todoItems[2]?.status).toBe('pending');
+    });
+
+    it('stamps startedAt when status transitions to in_progress', async () => {
+      // First call: all pending
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-1'),
+          assistantMsgWithTodoWrite([
+            { content: 'Task A', status: 'pending', activeForm: 'Task A' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Start', cwd: '/tmp' });
+
+      let reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems[0]?.startedAt).toBeNull();
+
+      // Second call: now in_progress
+      taskDocs.meta.meta.status = 'submitted';
+
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-2'),
+          assistantMsgWithTodoWrite([
+            { content: 'Task A', status: 'in_progress', activeForm: 'Working on Task A' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Continue', cwd: '/tmp' });
+
+      reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems[0]?.startedAt).toBeGreaterThan(0);
+    });
+
+    it('stamps completedAt when status transitions to completed', async () => {
+      // First call: in_progress
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-c1'),
+          assistantMsgWithTodoWrite([
+            { content: 'Task B', status: 'in_progress', activeForm: 'Working on Task B' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Start', cwd: '/tmp' });
+
+      let reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems[0]?.completedAt).toBeNull();
+
+      // Second call: now completed
+      taskDocs.meta.meta.status = 'submitted';
+
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-c2'),
+          assistantMsgWithTodoWrite([
+            { content: 'Task B', status: 'completed', activeForm: 'Completed Task B' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Continue', cwd: '/tmp' });
+
+      reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems[0]?.completedAt).toBeGreaterThan(0);
+    });
+
+    it('carries forward timestamps on subsequent calls', async () => {
+      // First call: in_progress (stamps startedAt)
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-carry-1'),
+          assistantMsgWithTodoWrite([
+            { content: 'Task C', status: 'in_progress', activeForm: 'Working on Task C' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Start', cwd: '/tmp' });
+
+      const reviewJson1 = taskDocs.review.toJSON();
+      const firstStartedAt = reviewJson1.todoItems[0]?.startedAt;
+      expect(firstStartedAt).toBeGreaterThan(0);
+
+      // Second call: still in_progress (should preserve the original startedAt)
+      taskDocs.meta.meta.status = 'submitted';
+
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-carry-2'),
+          assistantMsgWithTodoWrite([
+            { content: 'Task C', status: 'in_progress', activeForm: 'Still working on Task C' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Continue', cwd: '/tmp' });
+
+      const reviewJson2 = taskDocs.review.toJSON();
+      expect(reviewJson2.todoItems[0]?.startedAt).toBe(firstStartedAt);
+    });
+
+    it('performs full list replacement', async () => {
+      // First call: 3 items
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-replace-1'),
+          assistantMsgWithTodoWrite([
+            { content: 'Item 1', status: 'pending', activeForm: 'Item 1' },
+            { content: 'Item 2', status: 'pending', activeForm: 'Item 2' },
+            { content: 'Item 3', status: 'pending', activeForm: 'Item 3' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Start', cwd: '/tmp' });
+      expect(taskDocs.review.toJSON().todoItems).toHaveLength(3);
+
+      // Second call: only 2 items
+      taskDocs.meta.meta.status = 'submitted';
+
+      mockQuery.mockReturnValueOnce(
+        mockQueryResponse([
+          initMsg('sess-todo-replace-2'),
+          assistantMsgWithTodoWrite([
+            { content: 'Item A', status: 'in_progress', activeForm: 'Item A' },
+            { content: 'Item B', status: 'pending', activeForm: 'Item B' },
+          ]),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Continue', cwd: '/tmp' });
+
+      const reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems).toHaveLength(2);
+      expect(reviewJson.todoItems[0]?.content).toBe('Item A');
+      expect(reviewJson.todoItems[1]?.content).toBe('Item B');
+    });
+
+    it('handles malformed input gracefully', async () => {
+      // Pre-populate with a valid todo item
+      const { change: changeDoc } = await import('@loro-extended/change');
+      changeDoc(taskDocs.review, (draft) => {
+        draft.todoItems.push({
+          content: 'Existing item',
+          status: 'pending',
+          activeForm: 'Existing item',
+          startedAt: null,
+          completedAt: null,
+        });
+      });
+
+      // Send an assistant message where TodoWrite input is not valid JSON
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-todo-malformed'),
+          {
+            type: 'assistant',
+            message: {
+              content: [
+                {
+                  type: 'tool_use',
+                  id: 'todo-bad-json',
+                  name: 'TodoWrite',
+                  input: 'not valid json at all',
+                },
+              ],
+            },
+            parent_tool_use_id: null,
+            uuid: '00000000-0000-0000-0000-000000000041',
+            session_id: 'sess-1',
+          },
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      // The existing items should be unchanged since extractTodoItems returns []
+      const reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems).toHaveLength(1);
+      expect(reviewJson.todoItems[0]?.content).toBe('Existing item');
+    });
+
+    it('handles empty todos array without clearing existing items', async () => {
+      const { change: changeDoc } = await import('@loro-extended/change');
+      changeDoc(taskDocs.review, (draft) => {
+        draft.todoItems.push({
+          content: 'Pre-existing',
+          status: 'in_progress',
+          activeForm: 'Pre-existing',
+          startedAt: Date.now(),
+          completedAt: null,
+        });
+      });
+
+      // Send TodoWrite with an empty todos array (extractTodoItems returns [])
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-todo-empty'),
+          {
+            type: 'assistant',
+            message: {
+              content: [
+                {
+                  type: 'tool_use',
+                  id: 'todo-empty',
+                  name: 'TodoWrite',
+                  input: { todos: [] },
+                },
+              ],
+            },
+            parent_tool_use_id: null,
+            uuid: '00000000-0000-0000-0000-000000000042',
+            session_id: 'sess-1',
+          },
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      // Empty array from extractTodoItems triggers the early continue, so items unchanged
+      const reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.todoItems).toHaveLength(1);
+      expect(reviewJson.todoItems[0]?.content).toBe('Pre-existing');
     });
   });
 
