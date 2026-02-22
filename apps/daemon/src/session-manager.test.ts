@@ -39,7 +39,10 @@ vi.mock('./logger.js', () => ({
  * We add stub methods (interrupt, close, etc.) so the object satisfies
  * the Query interface shape at runtime.
  */
-function mockQueryResponse(messages: Array<Record<string, unknown>>): Query {
+function mockQueryResponse(
+  messages: Array<Record<string, unknown>>,
+  skills: Array<{ name: string; description: string; argumentHint: string }> = []
+): Query {
   async function* gen() {
     for (const msg of messages) {
       yield msg;
@@ -54,7 +57,7 @@ function mockQueryResponse(messages: Array<Record<string, unknown>>): Query {
     setModel: vi.fn(),
     setMaxThinkingTokens: vi.fn(),
     initializationResult: vi.fn(),
-    supportedCommands: vi.fn(),
+    supportedCommands: vi.fn().mockResolvedValue(skills),
     supportedModels: vi.fn(),
     mcpServerStatus: vi.fn(),
     accountInfo: vi.fn(),
@@ -86,7 +89,7 @@ function mockQueryThrows(messagesBeforeError: Array<Record<string, unknown>>, er
     setModel: vi.fn(),
     setMaxThinkingTokens: vi.fn(),
     initializationResult: vi.fn(),
-    supportedCommands: vi.fn(),
+    supportedCommands: vi.fn().mockResolvedValue([]),
     supportedModels: vi.fn(),
     mcpServerStatus: vi.fn(),
     accountInfo: vi.fn(),
@@ -312,7 +315,7 @@ function mockQueryControllable() {
     setModel: vi.fn(),
     setMaxThinkingTokens: vi.fn(),
     initializationResult: vi.fn(),
-    supportedCommands: vi.fn(),
+    supportedCommands: vi.fn().mockResolvedValue([]),
     supportedModels: vi.fn(),
     mcpServerStatus: vi.fn(),
     accountInfo: vi.fn(),
@@ -1471,7 +1474,7 @@ describe('SessionManager', () => {
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           options: expect.objectContaining({
-            settingSources: ['project'],
+            settingSources: ['user', 'project'],
             systemPrompt: expect.objectContaining({ type: 'preset', preset: 'claude_code' }),
           }),
         })
@@ -1484,13 +1487,13 @@ describe('SessionManager', () => {
       await manager.createSession({
         prompt: 'Hello',
         cwd: '/tmp',
-        settingSources: ['user', 'project'],
+        settingSources: ['project'],
       });
 
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           options: expect.objectContaining({
-            settingSources: ['user', 'project'],
+            settingSources: ['project'],
           }),
         })
       );
@@ -1560,11 +1563,163 @@ describe('SessionManager', () => {
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           options: expect.objectContaining({
-            settingSources: ['project'],
+            settingSources: ['user', 'project'],
             systemPrompt: expect.objectContaining({ type: 'preset', preset: 'claude_code' }),
           }),
         })
       );
+    });
+  });
+
+  describe('slash command escaping', () => {
+    const ZWSP = '\u200B';
+
+    function mockSkills(...names: string[]) {
+      return names.map((name) => ({ name, description: '', argumentHint: '' }));
+    }
+
+    it('escapes unknown /command in string prompt', async () => {
+      let capturedContent: unknown;
+      mockQuery.mockImplementation((args: Record<string, unknown>) => {
+        const promptIterable = args.prompt as AsyncIterable<Record<string, unknown>>;
+        (async () => {
+          for await (const msg of promptIterable) {
+            capturedContent = (msg as Record<string, unknown>).message;
+            break;
+          }
+        })();
+        return mockQueryResponse([initMsg('sess-slash'), successResult()]);
+      });
+
+      await manager.createSession({ prompt: '/test fix the bug', cwd: '/tmp' });
+
+      expect(capturedContent).toEqual({
+        role: 'user',
+        content: `${ZWSP}/test fix the bug`,
+      });
+    });
+
+    it('passes through known skill /command without escaping', async () => {
+      let capturedContent: unknown;
+      const skills = mockSkills('frontend-design', 'commit');
+      mockQuery.mockImplementation((args: Record<string, unknown>) => {
+        const promptIterable = args.prompt as AsyncIterable<Record<string, unknown>>;
+        (async () => {
+          for await (const msg of promptIterable) {
+            capturedContent = (msg as Record<string, unknown>).message;
+            break;
+          }
+        })();
+        return mockQueryResponse([initMsg('sess-known'), successResult()], skills);
+      });
+
+      await manager.createSession({ prompt: '/frontend-design build a landing page', cwd: '/tmp' });
+
+      expect(capturedContent).toEqual({
+        role: 'user',
+        content: '/frontend-design build a landing page',
+      });
+    });
+
+    it('does not escape prompts that do not start with /', async () => {
+      let capturedContent: unknown;
+      mockQuery.mockImplementation((args: Record<string, unknown>) => {
+        const promptIterable = args.prompt as AsyncIterable<Record<string, unknown>>;
+        (async () => {
+          for await (const msg of promptIterable) {
+            capturedContent = (msg as Record<string, unknown>).message;
+            break;
+          }
+        })();
+        return mockQueryResponse([initMsg('sess-normal'), successResult()]);
+      });
+
+      await manager.createSession({ prompt: 'Hello world', cwd: '/tmp' });
+
+      expect(capturedContent).toEqual({
+        role: 'user',
+        content: 'Hello world',
+      });
+    });
+
+    it('escapes unknown /command in ContentBlock[] prompt', async () => {
+      let capturedContent: unknown;
+      mockQuery.mockImplementation((args: Record<string, unknown>) => {
+        const promptIterable = args.prompt as AsyncIterable<Record<string, unknown>>;
+        (async () => {
+          for await (const msg of promptIterable) {
+            capturedContent = (msg as Record<string, unknown>).message;
+            break;
+          }
+        })();
+        return mockQueryResponse([initMsg('sess-blocks'), successResult()]);
+      });
+
+      await manager.createSession({
+        prompt: [{ type: 'text', text: '/test fix this' }],
+        cwd: '/tmp',
+      });
+
+      expect(capturedContent).toEqual({
+        role: 'user',
+        content: [{ type: 'text', text: `${ZWSP}/test fix this` }],
+      });
+    });
+
+    it('escapes follow-up slash commands using known skills from session init', async () => {
+      const pushedMessages: unknown[] = [];
+      const ctrl = mockQueryControllable();
+      ctrl.query.supportedCommands = vi.fn().mockResolvedValue(mockSkills('commit'));
+      mockQuery.mockImplementation((args: Record<string, unknown>) => {
+        const promptIterable = args.prompt as AsyncIterable<Record<string, unknown>>;
+        (async () => {
+          for await (const msg of promptIterable) {
+            pushedMessages.push((msg as Record<string, unknown>).message);
+          }
+        })();
+        return ctrl.query;
+      });
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      ctrl.emit(initMsg('sess-followup-slash'));
+      await new Promise((r) => setTimeout(r, 10));
+
+      manager.sendFollowUp('/unknown do something');
+      manager.sendFollowUp('/commit');
+
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
+
+      expect(pushedMessages).toHaveLength(3);
+      expect(pushedMessages[0]).toEqual({ role: 'user', content: 'Hello' });
+      expect(pushedMessages[1]).toEqual({ role: 'user', content: `${ZWSP}/unknown do something` });
+      expect(pushedMessages[2]).toEqual({ role: 'user', content: '/commit' });
+    });
+
+    it('gracefully handles supportedCommands failure and still escapes', async () => {
+      let capturedContent: unknown;
+      mockQuery.mockImplementation((args: Record<string, unknown>) => {
+        const promptIterable = args.prompt as AsyncIterable<Record<string, unknown>>;
+        (async () => {
+          for await (const msg of promptIterable) {
+            capturedContent = (msg as Record<string, unknown>).message;
+            break;
+          }
+        })();
+        const resp = mockQueryResponse([initMsg('sess-fail-cmd'), successResult()]);
+        resp.supportedCommands = vi.fn().mockRejectedValue(new Error('not available'));
+        return resp;
+      });
+
+      const result = await manager.createSession({ prompt: '/test hello', cwd: '/tmp' });
+
+      expect(result.status).toBe('completed');
+      expect(capturedContent).toEqual({
+        role: 'user',
+        content: `${ZWSP}/test hello`,
+      });
     });
   });
 
