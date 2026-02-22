@@ -354,7 +354,13 @@ function ChatPageInner() {
     planComments,
     deliveredCommentIds,
     markCommentsDelivered,
+    sessions,
   } = loroTask;
+
+  const totalCostUsd = useMemo(() => {
+    const sum = sessions.reduce((acc, s) => acc + (s.totalCostUsd ?? 0), 0);
+    return sum > 0 ? sum : null;
+  }, [sessions]);
   const taskHasUserMessage = useMemo(
     () => !!activeTaskId && (loroTask.conversation?.some((m) => m.role === 'user') ?? false),
     [activeTaskId, loroTask.conversation]
@@ -1372,6 +1378,7 @@ function ChatPageInner() {
             onToggleTerminal={toggleTerminal}
             onToggleSidePanel={useCallback(() => toggleSidePanel('diff'), [toggleSidePanel])}
             hasUnviewedDiff={hasUnviewedDiff}
+            totalCostUsd={totalCostUsd}
           />
 
           <main id="main-content" className="flex flex-col flex-1 min-h-0">
