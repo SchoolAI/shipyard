@@ -58,7 +58,9 @@ function enrichTodoTimestamps(
   };
 }
 
-export const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const IDLE_TIMEOUT_MS =
+  Number(process.env.SHIPYARD_IDLE_TIMEOUT_MS) || DEFAULT_IDLE_TIMEOUT_MS;
 export const IDLE_CHECK_INTERVAL_MS = 30_000;
 
 /**
@@ -618,7 +620,7 @@ export class SessionManager {
         clearInterval(idleTimer);
         idleTimedOut = true;
         logger.warn(
-          { sessionId, idleMs: Date.now() - lastMessageAt },
+          { sessionId, elapsedMs: Date.now() - lastMessageAt, lastMessageAt },
           'Session idle timeout, closing'
         );
         response.close();
@@ -653,6 +655,16 @@ export class SessionManager {
     const errorMsg = idleTimedOut
       ? 'Session idle timeout exceeded'
       : 'Session ended without result message';
+
+    if (idleTimedOut) {
+      this.#markInterrupted(sessionId);
+      return {
+        sessionId,
+        agentSessionId,
+        status: 'interrupted',
+        error: errorMsg,
+      };
+    }
 
     this.#markFailed(sessionId, errorMsg);
     return {
@@ -1002,21 +1014,31 @@ export class SessionManager {
     idleTimedOut: boolean,
     abortController?: AbortController
   ): SessionResult {
+    if (idleTimedOut) {
+      this.#markInterrupted(sessionId);
+      return {
+        sessionId,
+        agentSessionId,
+        status: 'interrupted',
+        error: 'Session idle timeout exceeded',
+      };
+    }
+
     if (abortController?.signal.aborted) {
       this.#markInterrupted(sessionId);
       return { sessionId, agentSessionId, status: 'interrupted' };
     }
 
-    const errorMsg = idleTimedOut
-      ? 'Session idle timeout exceeded'
-      : error instanceof Error
-        ? error.message
-        : String(error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
     this.#markFailed(sessionId, errorMsg);
     return { sessionId, agentSessionId, status: 'failed', error: errorMsg };
   }
 
   #markInterrupted(sessionId: string): void {
+    logger.info(
+      { sessionId, reason: 'interrupted', resumable: true },
+      'Session transitioning to interrupted'
+    );
     const idx = this.#findSessionIndex(sessionId);
     change(this.#convDoc, (draft) => {
       const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
@@ -1033,6 +1055,10 @@ export class SessionManager {
   }
 
   #markFailed(sessionId: string, errorMsg: string): void {
+    logger.info(
+      { sessionId, reason: errorMsg, resumable: false },
+      'Session transitioning to failed'
+    );
     const idx = this.#findSessionIndex(sessionId);
     change(this.#convDoc, (draft) => {
       const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
