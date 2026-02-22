@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDocumentId,
+  buildTaskConvDocId,
+  buildTaskMetaDocId,
+  buildTaskReviewDocId,
   DEFAULT_EPOCH,
   EPOCH_CLOSE_CODES,
   formatEpochCloseReason,
@@ -154,6 +157,45 @@ describe('epoch utilities', () => {
       const id = buildDocumentId('task', 'test-123', 3);
       const parsed = parseDocumentId(id);
       expect(parsed).toEqual({ prefix: 'task', key: 'test-123', epoch: 3 });
+    });
+  });
+
+  describe('task doc ID builders', () => {
+    it('builds correct task-meta doc ID', () => {
+      expect(buildTaskMetaDocId('abc123', 1)).toBe('task-meta:abc123:1');
+    });
+
+    it('builds correct task-conv doc ID', () => {
+      expect(buildTaskConvDocId('abc123', 1)).toBe('task-conv:abc123:1');
+    });
+
+    it('builds correct task-review doc ID', () => {
+      expect(buildTaskReviewDocId('abc123', 1)).toBe('task-review:abc123:1');
+    });
+
+    it('round-trips through parseDocumentId', () => {
+      const metaId = buildTaskMetaDocId('test-42', 3);
+      expect(parseDocumentId(metaId)).toEqual({ prefix: 'task-meta', key: 'test-42', epoch: 3 });
+
+      const convId = buildTaskConvDocId('test-42', 3);
+      expect(parseDocumentId(convId)).toEqual({ prefix: 'task-conv', key: 'test-42', epoch: 3 });
+
+      const reviewId = buildTaskReviewDocId('test-42', 3);
+      expect(parseDocumentId(reviewId)).toEqual({
+        prefix: 'task-review',
+        key: 'test-42',
+        epoch: 3,
+      });
+    });
+
+    it('uses different prefixes for the same task', () => {
+      const metaId = buildTaskMetaDocId('abc123', 1);
+      const convId = buildTaskConvDocId('abc123', 1);
+      const reviewId = buildTaskReviewDocId('abc123', 1);
+
+      expect(metaId).not.toBe(convId);
+      expect(metaId).not.toBe(reviewId);
+      expect(convId).not.toBe(reviewId);
     });
   });
 });

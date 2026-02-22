@@ -2,14 +2,20 @@ import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { change, type createTypedDoc } from '@loro-extended/change';
+import { change, type TypedDoc } from '@loro-extended/change';
 import { Repo } from '@loro-extended/repo';
 import {
-  buildDocumentId,
+  buildTaskConvDocId,
+  buildTaskMetaDocId,
+  buildTaskReviewDocId,
   DEFAULT_EPOCH,
   EpochDocumentSchema,
   generateTaskId,
-  TaskDocumentSchema,
+  TaskConversationDocumentSchema,
+  type TaskDocHandles,
+  TaskMetaDocumentSchema,
+  type TaskMetaDocumentShape,
+  TaskReviewDocumentSchema,
 } from '@shipyard/loro-schema';
 import { type Env, getShipyardHome, validateEnv } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
@@ -139,30 +145,45 @@ async function loadEpoch(repo: Repo): Promise<number> {
   return epochHandle.doc.toJSON().schema.version;
 }
 
-async function loadTaskDoc(repo: Repo, taskDocId: string, taskId: string, prompt?: string) {
-  const taskHandle = repo.get(taskDocId, TaskDocumentSchema);
+async function loadTaskDocs(
+  repo: Repo,
+  taskId: string,
+  epoch: number,
+  prompt?: string
+): Promise<TaskDocHandles> {
+  const metaHandle = repo.get(buildTaskMetaDocId(taskId, epoch), TaskMetaDocumentSchema);
+  const convHandle = repo.get(buildTaskConvDocId(taskId, epoch), TaskConversationDocumentSchema);
+  const reviewHandle = repo.get(buildTaskReviewDocId(taskId, epoch), TaskReviewDocumentSchema);
 
   try {
-    await taskHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
+    await Promise.all([
+      metaHandle.waitForSync({ kind: 'storage', timeout: 5_000 }),
+      convHandle.waitForSync({ kind: 'storage', timeout: 5_000 }),
+      reviewHandle.waitForSync({ kind: 'storage', timeout: 5_000 }),
+    ]);
   } catch {
-    logger.debug({ taskDocId }, 'No existing task data in storage (new task)');
+    logger.debug({ taskId, epoch }, 'No existing task data in storage (new task)');
   }
 
-  if (taskHandle.loroDoc.opCount() === 0) {
-    initializeTaskDoc(taskHandle.doc, taskId, prompt);
-    logger.debug({ taskDocId }, 'Initialized new task document');
+  if (metaHandle.loroDoc.opCount() === 0) {
+    initializeTaskMeta(metaHandle.doc, taskId, prompt);
+    logger.debug({ taskId, epoch }, 'Initialized new task meta document');
   }
 
-  return taskHandle;
+  return {
+    meta: metaHandle.doc,
+    conv: convHandle.doc,
+    review: reviewHandle.doc,
+  };
 }
 
-function initializeTaskDoc(
-  doc: ReturnType<typeof createTypedDoc<typeof TaskDocumentSchema>>,
+function initializeTaskMeta(
+  metaDoc: TypedDoc<TaskMetaDocumentShape>,
   taskId: string,
   prompt?: string
 ): void {
   const now = Date.now();
-  change(doc, (draft) => {
+  change(metaDoc, (draft) => {
     draft.meta.id = taskId;
     draft.meta.title = prompt?.slice(0, 80) ?? 'Untitled task';
     draft.meta.status = 'submitted';
@@ -298,11 +319,10 @@ async function main(): Promise<void> {
   });
 
   const epoch = await loadEpoch(repo);
-  const taskDocId = buildDocumentId('task', taskId, epoch);
-  log.info({ taskDocId, epoch }, 'Using task document');
+  log.info({ taskId, epoch }, 'Loading task documents');
 
-  const taskHandle = await loadTaskDoc(repo, taskDocId, taskId, args.prompt);
-  const manager = new SessionManager(taskHandle.doc);
+  const taskDocs = await loadTaskDocs(repo, taskId, epoch, args.prompt);
+  const manager = new SessionManager(taskDocs);
   const abortController = lifecycle.createAbortController();
   const startTime = Date.now();
 

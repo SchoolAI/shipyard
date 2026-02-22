@@ -1,11 +1,23 @@
 import type { Query } from '@anthropic-ai/claude-agent-sdk';
-import type { TypedDoc } from '@loro-extended/change';
 import { createTypedDoc, getLoroDoc } from '@loro-extended/change';
-import type { TaskDocumentShape } from '@shipyard/loro-schema';
-import { generateTaskId, TaskDocumentSchema } from '@shipyard/loro-schema';
+import type { TaskDocHandles } from '@shipyard/loro-schema';
+import {
+  generateTaskId,
+  TaskConversationDocumentSchema,
+  TaskMetaDocumentSchema,
+  TaskReviewDocumentSchema,
+} from '@shipyard/loro-schema';
 import { isContainer } from 'loro-crdt';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManager } from './session-manager.js';
+
+function createTaskDocHandles(): TaskDocHandles {
+  return {
+    meta: createTypedDoc(TaskMetaDocumentSchema),
+    conv: createTypedDoc(TaskConversationDocumentSchema),
+    review: createTypedDoc(TaskReviewDocumentSchema),
+  };
+}
 
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   query: vi.fn(),
@@ -337,7 +349,7 @@ function mockQueryControllable() {
 }
 
 describe('SessionManager', () => {
-  let taskDoc: TypedDoc<TaskDocumentShape>;
+  let taskDocs: TaskDocHandles;
   let manager: SessionManager;
   let mockQuery: ReturnType<typeof vi.fn>;
   const taskId = generateTaskId();
@@ -346,14 +358,14 @@ describe('SessionManager', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    taskDoc = createTypedDoc(TaskDocumentSchema);
-    taskDoc.meta.id = taskId;
-    taskDoc.meta.title = 'Test task';
-    taskDoc.meta.status = 'submitted';
-    taskDoc.meta.createdAt = now;
-    taskDoc.meta.updatedAt = now;
+    taskDocs = createTaskDocHandles();
+    taskDocs.meta.meta.id = taskId;
+    taskDocs.meta.meta.title = 'Test task';
+    taskDocs.meta.meta.status = 'submitted';
+    taskDocs.meta.meta.createdAt = now;
+    taskDocs.meta.meta.updatedAt = now;
 
-    manager = new SessionManager(taskDoc);
+    manager = new SessionManager(taskDocs);
 
     const mod = await import('@anthropic-ai/claude-agent-sdk');
     mockQuery = vi.mocked(mod.query);
@@ -391,7 +403,7 @@ describe('SessionManager', () => {
 
         await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         expect(json.conversation).toHaveLength(2);
         expect(json.conversation[0]?.role).toBe('assistant');
         expect(json.conversation[0]?.content).toHaveLength(1);
@@ -412,7 +424,7 @@ describe('SessionManager', () => {
 
         await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         expect(json.conversation).toHaveLength(1);
         expect(json.conversation[0]?.content).toHaveLength(2);
         expect(json.conversation[0]?.content[0]).toEqual({
@@ -446,7 +458,7 @@ describe('SessionManager', () => {
           'Assistant message carried an error'
         );
 
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         expect(json.conversation).toHaveLength(1);
         expect(json.conversation[0]?.content[0]).toEqual({
           type: 'text',
@@ -461,7 +473,7 @@ describe('SessionManager', () => {
 
         await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         expect(json.conversation).toHaveLength(1);
         expect(json.conversation[0]?.content).toHaveLength(1);
         expect(json.conversation[0]?.content[0]).toEqual({
@@ -480,7 +492,7 @@ describe('SessionManager', () => {
 
         mockQuery.mockImplementation(() => {
           // Capture status after the push (pending was set by createSession before query() is called)
-          const json = taskDoc.toJSON();
+          const json = taskDocs.conv.toJSON();
           const lastSession = json.sessions[json.sessions.length - 1];
           if (lastSession) {
             statusSnapshots.push(lastSession.status);
@@ -495,7 +507,7 @@ describe('SessionManager', () => {
         expect(statusSnapshots[0]).toBe('pending');
 
         // After everything completes, the session should be 'completed'
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         const session = json.sessions[0];
         expect(session?.status).toBe('completed');
       });
@@ -505,8 +517,7 @@ describe('SessionManager', () => {
 
         await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-        const json = taskDoc.toJSON();
-        expect(json.meta.status).toBe('completed');
+        expect(taskDocs.meta.toJSON().meta.status).toBe('completed');
       });
     });
 
@@ -525,7 +536,7 @@ describe('SessionManager', () => {
           model: 'claude-opus-4-6',
         });
 
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         const session = json.sessions[0];
         expect(session).toBeDefined();
         expect(session?.sessionId).toBe(result.sessionId);
@@ -544,7 +555,7 @@ describe('SessionManager', () => {
 
         await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         expect(json.sessions[0]?.model).toBeNull();
       });
     });
@@ -610,7 +621,7 @@ describe('SessionManager', () => {
           model: 'claude-opus-4-6-fast',
         });
 
-        const json = taskDoc.toJSON();
+        const json = taskDocs.conv.toJSON();
         expect(json.conversation).toHaveLength(1);
         expect(json.conversation[0]?.model).toBe('claude-opus-4-6-fast');
       });
@@ -792,8 +803,8 @@ describe('SessionManager', () => {
         expect(result.status).toBe('failed');
         expect(result.error).toBe('exceeded maximum turns');
 
-        const json = taskDoc.toJSON();
-        expect(json.meta.status).toBe('failed');
+        expect(taskDocs.meta.toJSON().meta.status).toBe('failed');
+        const json = taskDocs.conv.toJSON();
         expect(json.sessions[0]?.status).toBe('failed');
         expect(json.sessions[0]?.error).toBe('exceeded maximum turns');
       });
@@ -822,7 +833,9 @@ describe('SessionManager', () => {
         const result = await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
         expect(result.error).toBe('error_max_budget_usd');
-        expect(taskDoc.toJSON().sessions[0]?.error).toBe('Agent SDK error: error_max_budget_usd');
+        expect(taskDocs.conv.toJSON().sessions[0]?.error).toBe(
+          'Agent SDK error: error_max_budget_usd'
+        );
       });
 
       it('handles thrown errors from the generator', async () => {
@@ -836,8 +849,8 @@ describe('SessionManager', () => {
         expect(result.error).toBe('Process exited unexpectedly');
         expect(result.agentSessionId).toBe('sess-throw');
 
-        const json = taskDoc.toJSON();
-        expect(json.meta.status).toBe('failed');
+        expect(taskDocs.meta.toJSON().meta.status).toBe('failed');
+        const json = taskDocs.conv.toJSON();
         expect(json.sessions[0]?.status).toBe('failed');
         expect(json.sessions[0]?.error).toBe('Process exited unexpectedly');
       });
@@ -867,7 +880,7 @@ describe('SessionManager', () => {
 
   describe('resumeSession', () => {
     beforeEach(() => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'orig-session',
         agentSessionId: 'agent-sess-orig',
         status: 'completed',
@@ -911,7 +924,7 @@ describe('SessionManager', () => {
 
       expect(result.status).toBe('completed');
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       // Original session + new resumed session
       expect(json.sessions).toHaveLength(2);
       expect(json.sessions[1]?.sessionId).toBe(result.sessionId);
@@ -930,7 +943,7 @@ describe('SessionManager', () => {
 
       await manager.resumeSession('orig-session', 'Continue');
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       expect(json.conversation).toHaveLength(1);
       expect(json.conversation[0]?.content[0]).toEqual({
         type: 'text',
@@ -945,7 +958,7 @@ describe('SessionManager', () => {
     });
 
     it('throws for session without agentSessionId', async () => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'no-agent-id',
         agentSessionId: '',
         status: 'pending',
@@ -1013,7 +1026,7 @@ describe('SessionManager', () => {
         model: 'claude-sonnet-4-20250514',
       });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       const newSession = json.sessions.find((s) => s.sessionId === result.sessionId);
       expect(newSession?.model).toBe('claude-sonnet-4-20250514');
     });
@@ -1040,7 +1053,7 @@ describe('SessionManager', () => {
 
       const result = await manager.resumeSession('orig-session', 'Continue');
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       const newSession = json.sessions.find((s) => s.sessionId === result.sessionId);
       expect(newSession?.model).toBe('claude-opus-4-6');
     });
@@ -1059,7 +1072,7 @@ describe('SessionManager', () => {
       await manager.createSession({ prompt: 'First', cwd: '/tmp' });
 
       // Reset task status for second session
-      taskDoc.meta.status = 'submitted';
+      taskDocs.meta.meta.status = 'submitted';
 
       mockQuery.mockReturnValueOnce(
         mockQueryResponse([
@@ -1071,7 +1084,7 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Second', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       expect(json.sessions).toHaveLength(2);
       expect(json.sessions[0]?.agentSessionId).toBe('sess-first');
       expect(json.sessions[1]?.agentSessionId).toBe('sess-second');
@@ -1091,7 +1104,7 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       expect(json.conversation).toHaveLength(1);
     });
   });
@@ -1150,7 +1163,7 @@ describe('SessionManager', () => {
       const result = await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
       expect(result.status).toBe('completed');
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       expect(json.conversation).toHaveLength(1);
     });
 
@@ -1265,7 +1278,7 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       // First assistant msg gets the tool_result appended, second assistant msg is separate
       expect(json.conversation).toHaveLength(2);
       const firstMsg = json.conversation[0];
@@ -1292,7 +1305,7 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       expect(json.conversation).toHaveLength(1);
       const firstMsg = json.conversation[0];
       expect(firstMsg?.content).toHaveLength(2);
@@ -1317,7 +1330,7 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       expect(json.conversation).toHaveLength(1);
       expect(json.conversation[0]?.content).toHaveLength(1);
       expect(json.conversation[0]?.content[0]?.type).toBe('text');
@@ -1334,7 +1347,7 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       expect(json.conversation).toHaveLength(1);
       expect(json.conversation[0]?.role).toBe('assistant');
       expect(json.conversation[0]?.content[0]).toEqual({
@@ -1364,7 +1377,7 @@ describe('SessionManager', () => {
       mockQuery.mockImplementation(() => {
         // Before the first message is processed, simulate a concurrent CRDT sync
         // inserting another session entry at the beginning of the list
-        changeDoc(taskDoc, (draft) => {
+        changeDoc(taskDocs.conv, (draft) => {
           draft.sessions.insert(0, {
             sessionId: 'concurrent-session',
             agentSessionId: 'concurrent-agent-sess',
@@ -1391,7 +1404,7 @@ describe('SessionManager', () => {
       expect(result.status).toBe('completed');
       expect(result.agentSessionId).toBe('agent-sess-race');
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       // There should be 2 sessions: the concurrent one and the one we created
       expect(json.sessions).toHaveLength(2);
 
@@ -1412,7 +1425,7 @@ describe('SessionManager', () => {
 
       mockQuery.mockImplementation(() => {
         // Insert a concurrent session before ours
-        changeDoc(taskDoc, (draft) => {
+        changeDoc(taskDocs.conv, (draft) => {
           draft.sessions.insert(0, {
             sessionId: 'concurrent-session-2',
             agentSessionId: 'concurrent-agent-2',
@@ -1436,7 +1449,7 @@ describe('SessionManager', () => {
       expect(result.status).toBe('failed');
       expect(result.error).toBe('Unexpected crash');
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       // Concurrent session should be untouched
       const concurrentSession = json.sessions.find((s) => s.sessionId === 'concurrent-session-2');
       expect(concurrentSession?.status).toBe('active');
@@ -1522,7 +1535,7 @@ describe('SessionManager', () => {
     it('passes default settingSources and systemPrompt for resumeSession', async () => {
       const { change: changeDoc } = await import('@loro-extended/change');
       // Set up a completed session to resume from (mirrors resumeSession describe's beforeEach)
-      changeDoc(taskDoc, (draft) => {
+      changeDoc(taskDocs.conv, (draft) => {
         draft.sessions.push({
           sessionId: 'orig-session-for-defaults',
           agentSessionId: 'agent-sess-orig-defaults',
@@ -1561,7 +1574,7 @@ describe('SessionManager', () => {
     });
 
     it('returns the text from the last user message', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-1',
         role: 'user',
         content: [{ type: 'text', text: 'Hello world' }],
@@ -1577,7 +1590,7 @@ describe('SessionManager', () => {
     });
 
     it('concatenates multiple text content blocks with newlines', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-multi',
         role: 'user',
         content: [
@@ -1596,7 +1609,7 @@ describe('SessionManager', () => {
     });
 
     it('skips assistant messages and returns the last user message', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-user-1',
         role: 'user',
         content: [{ type: 'text', text: 'First user msg' }],
@@ -1607,7 +1620,7 @@ describe('SessionManager', () => {
         permissionMode: null,
         cwd: null,
       });
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-agent-1',
         role: 'assistant',
         content: [{ type: 'text', text: 'Assistant response' }],
@@ -1618,7 +1631,7 @@ describe('SessionManager', () => {
         permissionMode: null,
         cwd: null,
       });
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-user-2',
         role: 'user',
         content: [{ type: 'text', text: 'Follow-up question' }],
@@ -1634,7 +1647,7 @@ describe('SessionManager', () => {
     });
 
     it('returns null when only assistant messages exist', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-agent',
         role: 'assistant',
         content: [{ type: 'text', text: 'Assistant only' }],
@@ -1650,7 +1663,7 @@ describe('SessionManager', () => {
     });
 
     it('ignores non-text content blocks (tool_use, tool_result)', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-mixed',
         role: 'user',
         content: [
@@ -1681,7 +1694,7 @@ describe('SessionManager', () => {
     });
 
     it('returns text blocks from the last user message', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-1',
         role: 'user',
         content: [{ type: 'text', text: 'Hello world' }],
@@ -1697,7 +1710,7 @@ describe('SessionManager', () => {
     });
 
     it('returns image blocks alongside text blocks', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-img',
         role: 'user',
         content: [
@@ -1727,7 +1740,7 @@ describe('SessionManager', () => {
     });
 
     it('returns image-only messages (no text)', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-img-only',
         role: 'user',
         content: [
@@ -1755,7 +1768,7 @@ describe('SessionManager', () => {
     });
 
     it('filters out non-user-facing block types (tool_use, tool_result, thinking)', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-mixed-all',
         role: 'user',
         content: [
@@ -1792,7 +1805,7 @@ describe('SessionManager', () => {
     });
 
     it('returns null when only assistant messages exist', () => {
-      taskDoc.conversation.push({
+      taskDocs.conv.conversation.push({
         messageId: 'msg-agent',
         role: 'assistant',
         content: [{ type: 'text', text: 'Assistant only' }],
@@ -1814,7 +1827,7 @@ describe('SessionManager', () => {
     });
 
     it('returns { resume: true, sessionId } for a completed session with agentSessionId', () => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'sess-1',
         agentSessionId: 'agent-sess-1',
         status: 'completed',
@@ -1835,7 +1848,7 @@ describe('SessionManager', () => {
     });
 
     it('returns { resume: false } when all sessions have failed', () => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'sess-failed',
         agentSessionId: 'agent-sess-failed',
         status: 'failed',
@@ -1853,7 +1866,7 @@ describe('SessionManager', () => {
     });
 
     it('returns { resume: false } when sessions have no agentSessionId', () => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'sess-no-agent',
         agentSessionId: '',
         status: 'pending',
@@ -1871,7 +1884,7 @@ describe('SessionManager', () => {
     });
 
     it('picks the most recent non-failed session', () => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'sess-old',
         agentSessionId: 'agent-old',
         status: 'completed',
@@ -1884,7 +1897,7 @@ describe('SessionManager', () => {
         durationMs: 1000,
         error: null,
       });
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'sess-failed',
         agentSessionId: 'agent-failed',
         status: 'failed',
@@ -1897,7 +1910,7 @@ describe('SessionManager', () => {
         durationMs: null,
         error: 'crash',
       });
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'sess-latest',
         agentSessionId: 'agent-latest',
         status: 'active',
@@ -1967,8 +1980,7 @@ describe('SessionManager', () => {
       // Send a follow-up
       manager.sendFollowUp('continue please');
 
-      const json = taskDoc.toJSON();
-      expect(json.meta.status).toBe('working');
+      expect(taskDocs.meta.toJSON().meta.status).toBe('working');
 
       // Clean up
       ctrl.emit(successResult());
@@ -2059,8 +2071,7 @@ describe('SessionManager', () => {
       const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
       // Before init message, status should be 'starting'
-      const json = taskDoc.toJSON();
-      expect(json.meta.status).toBe('starting');
+      expect(taskDocs.meta.toJSON().meta.status).toBe('starting');
 
       ctrl.emit(initMsg('sess-starting'));
       ctrl.emit(successResult());
@@ -2075,7 +2086,7 @@ describe('SessionManager', () => {
       const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
       // Before init
-      expect(taskDoc.toJSON().meta.status).toBe('starting');
+      expect(taskDocs.meta.toJSON().meta.status).toBe('starting');
 
       // Emit init
       ctrl.emit(initMsg('sess-working'));
@@ -2083,7 +2094,7 @@ describe('SessionManager', () => {
       // Give microtask queue a tick for the for-await to process the message
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(taskDoc.toJSON().meta.status).toBe('working');
+      expect(taskDocs.meta.toJSON().meta.status).toBe('working');
 
       ctrl.emit(successResult());
       ctrl.end();
@@ -2124,14 +2135,14 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Make a plan', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
-      expect(json.plans).toHaveLength(1);
-      expect(json.plans[0]?.markdown).toBe(planMd);
-      expect(json.plans[0]?.reviewStatus).toBe('pending');
+      const reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.plans).toHaveLength(1);
+      expect(reviewJson.plans[0]?.markdown).toBe(planMd);
+      expect(reviewJson.plans[0]?.reviewStatus).toBe('pending');
 
-      const planId = json.plans[0]!.planId;
+      const planId = reviewJson.plans[0]!.planId;
 
-      const loroDoc = getLoroDoc(taskDoc);
+      const loroDoc = getLoroDoc(taskDocs.review);
       const planEditorDocsMap = loroDoc.getMap('planEditorDocs');
       const container = planEditorDocsMap.get(planId);
       expect(isContainer(container)).toBe(true);
@@ -2148,7 +2159,7 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Plan', cwd: '/tmp' });
 
-      taskDoc.meta.status = 'submitted';
+      taskDocs.meta.meta.status = 'submitted';
 
       mockQuery.mockReturnValueOnce(
         mockQueryResponse([
@@ -2160,8 +2171,8 @@ describe('SessionManager', () => {
 
       await manager.createSession({ prompt: 'Plan again', cwd: '/tmp' });
 
-      const json = taskDoc.toJSON();
-      expect(json.plans).toHaveLength(1);
+      const reviewJson = taskDocs.review.toJSON();
+      expect(reviewJson.plans).toHaveLength(1);
     });
   });
 
@@ -2175,7 +2186,7 @@ describe('SessionManager', () => {
         machineId: 'my-machine-1',
       });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       const session = json.sessions.find((s) => s.sessionId === result.sessionId);
       expect(session?.machineId).toBe('my-machine-1');
     });
@@ -2188,13 +2199,13 @@ describe('SessionManager', () => {
         cwd: '/tmp',
       });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       const session = json.sessions.find((s) => s.sessionId === result.sessionId);
       expect(session?.machineId).toBeNull();
     });
 
     it('stores machineId in resumed session entry', async () => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'orig-for-machine',
         agentSessionId: 'agent-orig-machine',
         status: 'completed',
@@ -2216,13 +2227,13 @@ describe('SessionManager', () => {
         machineId: 'new-machine',
       });
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       const newSession = json.sessions.find((s) => s.sessionId === result.sessionId);
       expect(newSession?.machineId).toBe('new-machine');
     });
 
     it('falls back to original machineId when resuming without override', async () => {
-      taskDoc.sessions.push({
+      taskDocs.conv.sessions.push({
         sessionId: 'orig-machine-fallback',
         agentSessionId: 'agent-fallback',
         status: 'completed',
@@ -2240,7 +2251,7 @@ describe('SessionManager', () => {
 
       const result = await manager.resumeSession('orig-machine-fallback', 'Continue');
 
-      const json = taskDoc.toJSON();
+      const json = taskDocs.conv.toJSON();
       const newSession = json.sessions.find((s) => s.sessionId === result.sessionId);
       expect(newSession?.machineId).toBe('inherited-machine');
     });

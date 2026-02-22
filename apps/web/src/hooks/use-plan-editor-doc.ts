@@ -2,13 +2,17 @@ export { usePlanEditorDoc };
 export type { PlanEditorDocResult };
 
 import { useDoc } from '@loro-extended/react';
-import { buildDocumentId, DEFAULT_EPOCH, TaskDocumentSchema } from '@shipyard/loro-schema';
+import {
+  buildTaskReviewDocId,
+  DEFAULT_EPOCH,
+  TaskReviewDocumentSchema,
+} from '@shipyard/loro-schema';
 import type { ContainerID, LoroDoc } from 'loro-crdt';
 import { isContainer } from 'loro-crdt';
 import { useMemo } from 'react';
 import { useRepo } from '../providers/repo-provider';
 
-const SENTINEL_DOC_ID = buildDocumentId('task', '__sentinel__', DEFAULT_EPOCH);
+const SENTINEL_DOC_ID = buildTaskReviewDocId('__sentinel__', DEFAULT_EPOCH);
 
 interface PlanEditorDocResult {
   loroDoc: LoroDoc | null;
@@ -20,12 +24,12 @@ function usePlanEditorDoc(taskId: string | null, planId: string | null): PlanEdi
   const repo = useRepo();
 
   const docId = useMemo(
-    () => (taskId ? buildDocumentId('task', taskId, DEFAULT_EPOCH) : SENTINEL_DOC_ID),
+    () => (taskId ? buildTaskReviewDocId(taskId, DEFAULT_EPOCH) : SENTINEL_DOC_ID),
     [taskId]
   );
 
   // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-  const handle = useMemo(() => repo.get(docId, TaskDocumentSchema as never), [repo, docId]);
+  const handle = useMemo(() => repo.get(docId, TaskReviewDocumentSchema as never), [repo, docId]);
 
   const planEditorDocs = useDoc(
     handle,

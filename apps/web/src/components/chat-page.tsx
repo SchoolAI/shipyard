@@ -9,15 +9,20 @@ import type {
 import {
   addTaskToIndex,
   buildDocumentId,
+  buildTaskConvDocId,
+  buildTaskMetaDocId,
+  buildTaskReviewDocId,
   DEFAULT_EPOCH,
   generateTaskId,
   LOCAL_USER_ID,
   PERMISSION_MODES,
   REASONING_EFFORTS,
   ROOM_EPHEMERAL_DECLARATIONS,
-  TaskDocumentSchema,
+  TaskConversationDocumentSchema,
   TaskIndexDocumentSchema,
   type TaskIndexDocumentShape,
+  TaskMetaDocumentSchema,
+  TaskReviewDocumentSchema,
   TERMINAL_TASK_STATES,
 } from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
@@ -181,6 +186,119 @@ function toContentBlocks(text: string, images?: SubmitPayload['images']): Conten
     }
   }
   return blocks;
+}
+
+function writeCrdtDocs(
+  repo: ReturnType<typeof useRepo>,
+  opts: {
+    currentTaskId: string;
+    message: string;
+    payload: SubmitPayload;
+    model: string | undefined;
+    reasoningEffort: import('@shipyard/loro-schema').ReasoningEffort | null;
+    permissionMode: import('@shipyard/loro-schema').PermissionMode | null;
+    diffComments: import('@shipyard/loro-schema').DiffComment[];
+    planComments: import('@shipyard/loro-schema').PlanComment[];
+    deliveredCommentIds: string[];
+    selectedMachineId: string | null | undefined;
+    selectedEnvironmentPath: string | null | undefined;
+    homeDir: string | null | undefined;
+    isAgentRunning: boolean;
+  }
+) {
+  const now = Date.now();
+  const {
+    currentTaskId,
+    message,
+    payload,
+    model,
+    reasoningEffort,
+    permissionMode,
+    diffComments,
+    planComments,
+    deliveredCommentIds,
+    selectedMachineId,
+    selectedEnvironmentPath,
+    homeDir,
+    isAgentRunning,
+  } = opts;
+
+  const metaDocId = buildTaskMetaDocId(currentTaskId, DEFAULT_EPOCH);
+  const metaDocHandle = repo.get(metaDocId, TaskMetaDocumentSchema);
+  const isNewTask = metaDocHandle.loroDoc.opCount() === 0;
+
+  const { fullMessage, commentIdsToDeliver } = buildAutoAttachFeedback(
+    message,
+    diffComments,
+    planComments,
+    deliveredCommentIds
+  );
+
+  change(metaDocHandle.doc, (draft) => {
+    if (isNewTask) {
+      draft.meta.id = currentTaskId;
+      draft.meta.title = message.slice(0, 80);
+      draft.meta.createdAt = now;
+    }
+    if (!isAgentRunning) {
+      draft.meta.status = 'submitted';
+    }
+    draft.meta.updatedAt = now;
+  });
+
+  if (commentIdsToDeliver.length > 0) {
+    const reviewDocId = buildTaskReviewDocId(currentTaskId, DEFAULT_EPOCH);
+    const reviewDocHandle = repo.get(reviewDocId, TaskReviewDocumentSchema);
+    change(reviewDocHandle.doc, (draft) => {
+      for (const id of commentIdsToDeliver) {
+        draft.deliveredCommentIds.push(id);
+      }
+    });
+  }
+
+  const convDocId = buildTaskConvDocId(currentTaskId, DEFAULT_EPOCH);
+  const convDocHandle = repo.get(convDocId, TaskConversationDocumentSchema);
+  change(convDocHandle.doc, (draft) => {
+    const contentBlocks: ContentBlock[] = [];
+    if (fullMessage) contentBlocks.push({ type: 'text', text: fullMessage });
+    for (const img of payload.images) {
+      contentBlocks.push({
+        type: 'image',
+        id: crypto.randomUUID(),
+        source: { type: 'base64', mediaType: img.mediaType, data: img.data },
+      });
+    }
+
+    const userMessage = {
+      messageId: crypto.randomUUID(),
+      role: 'user' as const,
+      content: contentBlocks,
+      timestamp: now,
+      model: model || null,
+      machineId: selectedMachineId ?? null,
+      reasoningEffort,
+      permissionMode,
+      cwd: selectedEnvironmentPath ?? homeDir ?? null,
+    };
+
+    if (isAgentRunning) {
+      draft.pendingFollowUps.push(userMessage);
+    } else {
+      draft.conversation.push(userMessage);
+    }
+  });
+
+  if (isNewTask) {
+    const roomDocId = buildDocumentId('room', LOCAL_USER_ID, DEFAULT_EPOCH);
+    const roomHandle = repo.get(roomDocId, TaskIndexDocumentSchema as never);
+    addTaskToIndex(roomHandle.doc, {
+      taskId: currentTaskId,
+      title: message.slice(0, 80),
+      status: 'submitted',
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -1186,76 +1304,21 @@ function ChatPageInner() {
       });
 
       if (useLoro && repo) {
-        const docId = buildDocumentId('task', currentTaskId, DEFAULT_EPOCH);
-        const handle = repo.get(docId, TaskDocumentSchema);
-
-        const now = Date.now();
-        const isNewTask = handle.loroDoc.opCount() === 0;
-
-        const { fullMessage, commentIdsToDeliver } = buildAutoAttachFeedback(
+        writeCrdtDocs(repo, {
+          currentTaskId,
           message,
+          payload,
+          model,
+          reasoningEffort,
+          permissionMode,
           diffComments,
           planComments,
-          deliveredCommentIds
-        );
-
-        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: CRDT write handles new task init, status, content blocks, images, and queue routing
-        change(handle.doc, (draft) => {
-          if (isNewTask) {
-            draft.meta.id = currentTaskId;
-            draft.meta.title = message.slice(0, 80);
-            draft.meta.createdAt = now;
-          }
-          if (!isAgentRunningRef.current) {
-            draft.meta.status = 'submitted';
-          }
-          draft.meta.updatedAt = now;
-
-          for (const id of commentIdsToDeliver) {
-            draft.deliveredCommentIds.push(id);
-          }
-
-          const contentBlocks: ContentBlock[] = [];
-          if (fullMessage) contentBlocks.push({ type: 'text', text: fullMessage });
-          for (const img of payload.images) {
-            contentBlocks.push({
-              type: 'image',
-              id: crypto.randomUUID(),
-              source: { type: 'base64', mediaType: img.mediaType, data: img.data },
-            });
-          }
-
-          const userMessage = {
-            messageId: crypto.randomUUID(),
-            role: 'user' as const,
-            content: contentBlocks,
-            timestamp: now,
-            model: model || null,
-            machineId: selectedMachineId ?? null,
-            reasoningEffort,
-            permissionMode,
-            cwd: selectedEnvironmentPath ?? homeDir ?? null,
-          };
-
-          if (isAgentRunningRef.current) {
-            draft.pendingFollowUps.push(userMessage);
-          } else {
-            draft.conversation.push(userMessage);
-          }
+          deliveredCommentIds,
+          selectedMachineId,
+          selectedEnvironmentPath,
+          homeDir,
+          isAgentRunning: isAgentRunningRef.current,
         });
-
-        if (isNewTask) {
-          const roomDocId = buildDocumentId('room', LOCAL_USER_ID, DEFAULT_EPOCH);
-          // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-          const roomHandle = repo.get(roomDocId, TaskIndexDocumentSchema as never);
-          addTaskToIndex(roomHandle.doc, {
-            taskId: currentTaskId,
-            title: message.slice(0, 80),
-            status: 'submitted',
-            createdAt: now,
-            updatedAt: now,
-          });
-        }
       }
 
       if (connection && selectedMachineId) {

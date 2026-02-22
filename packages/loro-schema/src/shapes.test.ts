@@ -1,9 +1,14 @@
 import { createTypedDoc } from '@loro-extended/change';
 import { LoroDoc } from 'loro-crdt';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { buildDocumentId, DEFAULT_EPOCH, parseDocumentId } from './epoch.js';
 import { generateSessionId, generateTaskId } from './ids.js';
-import { EpochDocumentSchema, TaskDocumentSchema } from './shapes.js';
+import {
+  EpochDocumentSchema,
+  TaskConversationDocumentSchema,
+  TaskMetaDocumentSchema,
+  TaskReviewDocumentSchema,
+} from './shapes.js';
 
 describe('EpochDocumentSchema', () => {
   it('creates a typed doc with schema version', () => {
@@ -20,463 +25,6 @@ describe('EpochDocumentSchema', () => {
     doc.schema.version = 2;
 
     expect(doc.toJSON().schema.version).toBe(2);
-  });
-});
-
-describe('TaskDocumentSchema', () => {
-  let doc: ReturnType<typeof createTypedDoc<typeof TaskDocumentSchema>>;
-  const taskId = generateTaskId();
-  const now = Date.now();
-
-  beforeEach(() => {
-    doc = createTypedDoc(TaskDocumentSchema, { doc: new LoroDoc() });
-    doc.meta.id = taskId;
-    doc.meta.title = 'Test task';
-    doc.meta.status = 'submitted';
-    doc.meta.createdAt = now;
-    doc.meta.updatedAt = now;
-  });
-
-  describe('meta', () => {
-    it('stores task metadata', () => {
-      const json = doc.toJSON();
-      expect(json.meta.id).toBe(taskId);
-      expect(json.meta.title).toBe('Test task');
-      expect(json.meta.status).toBe('submitted');
-      expect(json.meta.createdAt).toBe(now);
-    });
-
-    it('updates status', () => {
-      doc.meta.status = 'working';
-      doc.meta.updatedAt = Date.now();
-
-      expect(doc.toJSON().meta.status).toBe('working');
-    });
-  });
-
-  describe('conversation (MCP-aligned messages)', () => {
-    it('adds a text message', () => {
-      doc.conversation.push({
-        messageId: 'msg-1',
-        role: 'user',
-        content: [{ type: 'text', text: 'Hello agent' }],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      expect(json.conversation).toHaveLength(1);
-      expect(json.conversation[0]?.role).toBe('user');
-      expect(json.conversation[0]?.content[0]?.type).toBe('text');
-      if (json.conversation[0]?.content[0]?.type === 'text') {
-        expect(json.conversation[0].content[0].text).toBe('Hello agent');
-      }
-    });
-
-    it('adds an assistant response with text', () => {
-      doc.conversation.push({
-        messageId: 'msg-2',
-        role: 'assistant',
-        content: [{ type: 'text', text: 'Hello human' }],
-        timestamp: now + 1000,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      expect(json.conversation[0]?.role).toBe('assistant');
-      expect(json.conversation[0]?.content[0]?.type).toBe('text');
-    });
-
-    it('supports tool_use blocks', () => {
-      doc.conversation.push({
-        messageId: 'msg-3',
-        role: 'assistant',
-        content: [
-          {
-            type: 'tool_use',
-            toolUseId: 'tu-1',
-            toolName: 'Read',
-            input: JSON.stringify({ file_path: '/tmp/test.ts' }),
-            parentToolUseId: null,
-          },
-        ],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      const block = json.conversation[0]?.content[0];
-      expect(block?.type).toBe('tool_use');
-      if (block?.type === 'tool_use') {
-        expect(block.toolUseId).toBe('tu-1');
-        expect(block.toolName).toBe('Read');
-        expect(JSON.parse(block.input)).toEqual({ file_path: '/tmp/test.ts' });
-      }
-    });
-
-    it('supports tool_result blocks', () => {
-      doc.conversation.push({
-        messageId: 'msg-4',
-        role: 'user',
-        content: [
-          {
-            type: 'tool_result',
-            toolUseId: 'tu-1',
-            content: 'File contents here',
-            isError: false,
-            parentToolUseId: null,
-          },
-        ],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      const block = json.conversation[0]?.content[0];
-      expect(block?.type).toBe('tool_result');
-      if (block?.type === 'tool_result') {
-        expect(block.toolUseId).toBe('tu-1');
-        expect(block.content).toBe('File contents here');
-        expect(block.isError).toBe(false);
-      }
-    });
-
-    it('supports thinking blocks', () => {
-      doc.conversation.push({
-        messageId: 'msg-5',
-        role: 'assistant',
-        content: [
-          {
-            type: 'thinking',
-            text: 'Let me analyze this problem...',
-          },
-        ],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      const block = json.conversation[0]?.content[0];
-      expect(block?.type).toBe('thinking');
-      if (block?.type === 'thinking') {
-        expect(block.text).toBe('Let me analyze this problem...');
-      }
-    });
-
-    it('supports image blocks with base64 source and id', () => {
-      doc.conversation.push({
-        messageId: 'msg-img',
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            id: 'img_abc123',
-            source: { type: 'base64', mediaType: 'image/png', data: 'iVBOR...' },
-          },
-        ],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      expect(json.conversation).toHaveLength(1);
-      const block = json.conversation[0]?.content[0];
-      expect(block?.type).toBe('image');
-      if (block?.type === 'image') {
-        expect(block.id).toBe('img_abc123');
-        expect(block.source.type).toBe('base64');
-        if (block.source.type === 'base64') {
-          expect(block.source.mediaType).toBe('image/png');
-          expect(block.source.data).toBe('iVBOR...');
-        }
-      }
-    });
-
-    it('supports mixed text and image content', () => {
-      doc.conversation.push({
-        messageId: 'msg-mixed-img',
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Check this screenshot' },
-          {
-            type: 'image',
-            id: 'img_mixed1',
-            source: { type: 'base64', mediaType: 'image/jpeg', data: '/9j/4AAQ...' },
-          },
-        ],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      expect(json.conversation[0]?.content).toHaveLength(2);
-      expect(json.conversation[0]?.content[0]?.type).toBe('text');
-      expect(json.conversation[0]?.content[1]?.type).toBe('image');
-    });
-
-    it('supports messages with mixed content blocks', () => {
-      doc.conversation.push({
-        messageId: 'msg-6',
-        role: 'assistant',
-        content: [
-          { type: 'thinking', text: 'I should read the file first.' },
-          { type: 'text', text: 'Let me check that file for you.' },
-          {
-            type: 'tool_use',
-            toolUseId: 'tu-2',
-            toolName: 'Read',
-            input: JSON.stringify({ file_path: '/src/main.ts' }),
-            parentToolUseId: null,
-          },
-        ],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      expect(json.conversation[0]?.content).toHaveLength(3);
-      expect(json.conversation[0]?.content[0]?.type).toBe('thinking');
-      expect(json.conversation[0]?.content[1]?.type).toBe('text');
-      expect(json.conversation[0]?.content[2]?.type).toBe('tool_use');
-    });
-
-    it('supports tool_result with error', () => {
-      doc.conversation.push({
-        messageId: 'msg-7',
-        role: 'user',
-        content: [
-          {
-            type: 'tool_result',
-            toolUseId: 'tu-3',
-            content: 'Permission denied: /etc/shadow',
-            isError: true,
-            parentToolUseId: null,
-          },
-        ],
-        timestamp: now,
-        model: null,
-        machineId: null,
-        reasoningEffort: null,
-        permissionMode: null,
-        cwd: null,
-      });
-
-      const json = doc.toJSON();
-      const block = json.conversation[0]?.content[0];
-      expect(block?.type).toBe('tool_result');
-      if (block?.type === 'tool_result') {
-        expect(block.isError).toBe(true);
-        expect(block.content).toContain('Permission denied');
-      }
-    });
-  });
-
-  describe('sessions', () => {
-    it('adds a session entry', () => {
-      const sessionId = generateSessionId();
-
-      doc.sessions.push({
-        sessionId,
-        agentSessionId: 'sdk-session-abc',
-        status: 'active',
-        cwd: '/home/user/project',
-        model: 'claude-opus-4-6',
-        machineId: null,
-        createdAt: now,
-        completedAt: null,
-        totalCostUsd: null,
-        durationMs: null,
-        error: null,
-      });
-
-      const json = doc.toJSON();
-      expect(json.sessions).toHaveLength(1);
-      expect(json.sessions[0]?.sessionId).toBe(sessionId);
-      expect(json.sessions[0]?.agentSessionId).toBe('sdk-session-abc');
-      expect(json.sessions[0]?.status).toBe('active');
-      expect(json.sessions[0]?.model).toBe('claude-opus-4-6');
-    });
-
-    it('tracks session completion', () => {
-      const sessionId = generateSessionId();
-      const completedAt = now + 60_000;
-
-      doc.sessions.push({
-        sessionId,
-        agentSessionId: 'sdk-session-def',
-        status: 'completed',
-        cwd: '/home/user/project',
-        model: null,
-        machineId: null,
-        createdAt: now,
-        completedAt,
-        totalCostUsd: 0.05,
-        durationMs: 60_000,
-        error: null,
-      });
-
-      const json = doc.toJSON();
-      expect(json.sessions[0]?.status).toBe('completed');
-      expect(json.sessions[0]?.totalCostUsd).toBe(0.05);
-      expect(json.sessions[0]?.durationMs).toBe(60_000);
-    });
-
-    it('tracks session failure', () => {
-      doc.sessions.push({
-        sessionId: generateSessionId(),
-        agentSessionId: 'sdk-session-fail',
-        status: 'failed',
-        cwd: '/tmp',
-        model: null,
-        machineId: null,
-        createdAt: now,
-        completedAt: now + 1000,
-        totalCostUsd: null,
-        durationMs: 1000,
-        error: 'error_max_turns: exceeded maximum turns',
-      });
-
-      const json = doc.toJSON();
-      expect(json.sessions[0]?.status).toBe('failed');
-      expect(json.sessions[0]?.error).toContain('error_max_turns');
-    });
-  });
-
-  describe('diffComments', () => {
-    it('adds a comment to the record', () => {
-      const commentId = 'cmt-1';
-      doc.diffComments.set(commentId, {
-        commentId,
-        filePath: 'src/index.ts',
-        lineNumber: 42,
-        side: 'new',
-        diffScope: 'working-tree',
-        lineContentHash: 'abc123',
-        body: 'This null check looks wrong',
-        authorType: 'human',
-        authorId: 'user-1',
-        createdAt: now,
-        resolvedAt: null,
-      });
-
-      const json = doc.toJSON();
-      expect(Object.keys(json.diffComments)).toHaveLength(1);
-      expect(json.diffComments[commentId]?.body).toBe('This null check looks wrong');
-      expect(json.diffComments[commentId]?.lineNumber).toBe(42);
-      expect(json.diffComments[commentId]?.resolvedAt).toBe(null);
-    });
-
-    it('resolves a comment', () => {
-      const commentId = 'cmt-2';
-      doc.diffComments.set(commentId, {
-        commentId,
-        filePath: 'src/app.tsx',
-        lineNumber: 10,
-        side: 'new',
-        diffScope: 'last-turn',
-        lineContentHash: 'def456',
-        body: 'Why did the agent remove this?',
-        authorType: 'human',
-        authorId: 'user-1',
-        createdAt: now,
-        resolvedAt: null,
-      });
-
-      const entry = doc.diffComments.get(commentId);
-      if (entry) {
-        doc.diffComments.set(commentId, { ...entry, resolvedAt: now + 5000 });
-      }
-
-      const json = doc.toJSON();
-      expect(json.diffComments[commentId]?.resolvedAt).toBe(now + 5000);
-    });
-
-    it('deletes a comment', () => {
-      const commentId = 'cmt-3';
-      doc.diffComments.set(commentId, {
-        commentId,
-        filePath: 'src/utils.ts',
-        lineNumber: 1,
-        side: 'old',
-        diffScope: 'working-tree',
-        lineContentHash: 'ghi789',
-        body: 'Temporary comment',
-        authorType: 'agent',
-        authorId: 'claude-1',
-        createdAt: now,
-        resolvedAt: null,
-      });
-
-      expect(Object.keys(doc.toJSON().diffComments)).toHaveLength(1);
-      doc.diffComments.delete(commentId);
-      expect(Object.keys(doc.toJSON().diffComments)).toHaveLength(0);
-    });
-
-    it('supports multiple comments on different files', () => {
-      doc.diffComments.set('cmt-a', {
-        commentId: 'cmt-a',
-        filePath: 'src/a.ts',
-        lineNumber: 1,
-        side: 'new',
-        diffScope: 'working-tree',
-        lineContentHash: 'hash-a',
-        body: 'Comment A',
-        authorType: 'human',
-        authorId: 'user-1',
-        createdAt: now,
-        resolvedAt: null,
-      });
-      doc.diffComments.set('cmt-b', {
-        commentId: 'cmt-b',
-        filePath: 'src/b.ts',
-        lineNumber: 5,
-        side: 'old',
-        diffScope: 'last-turn',
-        lineContentHash: 'hash-b',
-        body: 'Comment B',
-        authorType: 'agent',
-        authorId: 'claude-1',
-        createdAt: now + 1000,
-        resolvedAt: null,
-      });
-
-      const json = doc.toJSON();
-      expect(Object.keys(json.diffComments)).toHaveLength(2);
-      expect(json.diffComments['cmt-a']?.filePath).toBe('src/a.ts');
-      expect(json.diffComments['cmt-b']?.authorType).toBe('agent');
-    });
   });
 });
 
@@ -505,5 +53,356 @@ describe('document ID helpers', () => {
     const id = buildDocumentId('task', 'my-task', 3);
     const parsed = parseDocumentId(id);
     expect(parsed).toEqual({ prefix: 'task', key: 'my-task', epoch: 3 });
+  });
+});
+
+describe('TaskMetaDocumentSchema', () => {
+  it('creates a valid typed document', () => {
+    const doc = createTypedDoc(TaskMetaDocumentSchema, { doc: new LoroDoc() });
+    const json = doc.toJSON();
+
+    expect(json).toHaveProperty('meta');
+    expect(json.meta).toHaveProperty('id');
+    expect(json.meta).toHaveProperty('title');
+    expect(json.meta).toHaveProperty('status');
+    expect(json.meta).toHaveProperty('createdAt');
+    expect(json.meta).toHaveProperty('updatedAt');
+  });
+
+  it('supports field-level updates via change()', () => {
+    const taskId = generateTaskId();
+    const now = Date.now();
+    const doc = createTypedDoc(TaskMetaDocumentSchema, { doc: new LoroDoc() });
+
+    doc.meta.id = taskId;
+    doc.meta.title = 'Meta task';
+    doc.meta.status = 'submitted';
+    doc.meta.createdAt = now;
+    doc.meta.updatedAt = now;
+
+    const json = doc.toJSON();
+    expect(json.meta.id).toBe(taskId);
+    expect(json.meta.title).toBe('Meta task');
+    expect(json.meta.status).toBe('submitted');
+    expect(json.meta.createdAt).toBe(now);
+    expect(json.meta.updatedAt).toBe(now);
+
+    doc.meta.title = 'Updated meta task';
+    doc.meta.status = 'working';
+    doc.meta.updatedAt = now + 1000;
+
+    const updated = doc.toJSON();
+    expect(updated.meta.title).toBe('Updated meta task');
+    expect(updated.meta.status).toBe('working');
+    expect(updated.meta.updatedAt).toBe(now + 1000);
+  });
+
+  it('merges concurrent meta changes across peers', () => {
+    const taskId = generateTaskId();
+    const now = Date.now();
+
+    const loroDoc1 = new LoroDoc();
+    loroDoc1.setPeerId(BigInt(1));
+    const doc1 = createTypedDoc(TaskMetaDocumentSchema, { doc: loroDoc1 });
+
+    doc1.meta.id = taskId;
+    doc1.meta.title = 'Initial title';
+    doc1.meta.status = 'submitted';
+    doc1.meta.createdAt = now;
+    doc1.meta.updatedAt = now;
+
+    const loroDoc2 = new LoroDoc();
+    loroDoc2.setPeerId(BigInt(2));
+    loroDoc2.import(loroDoc1.export({ mode: 'snapshot' }));
+    const doc2 = createTypedDoc(TaskMetaDocumentSchema, { doc: loroDoc2 });
+
+    doc1.meta.title = 'Title from peer 1';
+    doc2.meta.status = 'working';
+
+    loroDoc1.import(loroDoc2.export({ mode: 'snapshot' }));
+    loroDoc2.import(loroDoc1.export({ mode: 'snapshot' }));
+
+    const json1 = doc1.toJSON();
+    const json2 = doc2.toJSON();
+
+    expect(json1.meta.title).toBe('Title from peer 1');
+    expect(json1.meta.status).toBe('working');
+    expect(json1).toEqual(json2);
+  });
+});
+
+describe('TaskConversationDocumentSchema', () => {
+  it('creates a valid typed document', () => {
+    const doc = createTypedDoc(TaskConversationDocumentSchema, { doc: new LoroDoc() });
+    const json = doc.toJSON();
+
+    expect(json).toHaveProperty('conversation');
+    expect(json).toHaveProperty('pendingFollowUps');
+    expect(json).toHaveProperty('sessions');
+    expect(json).toHaveProperty('diffState');
+    expect(Array.isArray(json.conversation)).toBe(true);
+    expect(Array.isArray(json.pendingFollowUps)).toBe(true);
+    expect(Array.isArray(json.sessions)).toBe(true);
+  });
+
+  it('appends messages to conversation', () => {
+    const now = Date.now();
+    const doc = createTypedDoc(TaskConversationDocumentSchema, { doc: new LoroDoc() });
+
+    doc.conversation.push({
+      messageId: 'msg-1',
+      role: 'user',
+      content: [{ type: 'text', text: 'Hello agent' }],
+      timestamp: now,
+      model: null,
+      machineId: null,
+      reasoningEffort: null,
+      permissionMode: null,
+      cwd: null,
+    });
+
+    doc.conversation.push({
+      messageId: 'msg-2',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Hello human' }],
+      timestamp: now + 1000,
+      model: 'claude-opus-4-6',
+      machineId: null,
+      reasoningEffort: null,
+      permissionMode: null,
+      cwd: null,
+    });
+
+    const json = doc.toJSON();
+    expect(json.conversation).toHaveLength(2);
+    expect(json.conversation[0]?.role).toBe('user');
+    expect(json.conversation[1]?.role).toBe('assistant');
+    if (json.conversation[1]?.content[0]?.type === 'text') {
+      expect(json.conversation[1].content[0].text).toBe('Hello human');
+    }
+  });
+
+  it('tracks sessions', () => {
+    const now = Date.now();
+    const sessionId = generateSessionId();
+    const doc = createTypedDoc(TaskConversationDocumentSchema, { doc: new LoroDoc() });
+
+    doc.sessions.push({
+      sessionId,
+      agentSessionId: 'sdk-session-conv-1',
+      status: 'active',
+      cwd: '/home/user/project',
+      model: 'claude-opus-4-6',
+      machineId: null,
+      createdAt: now,
+      completedAt: null,
+      totalCostUsd: null,
+      durationMs: null,
+      error: null,
+    });
+
+    doc.sessions.push({
+      sessionId: generateSessionId(),
+      agentSessionId: 'sdk-session-conv-2',
+      status: 'completed',
+      cwd: '/home/user/project',
+      model: null,
+      machineId: null,
+      createdAt: now + 1000,
+      completedAt: now + 60_000,
+      totalCostUsd: 0.12,
+      durationMs: 59_000,
+      error: null,
+    });
+
+    const json = doc.toJSON();
+    expect(json.sessions).toHaveLength(2);
+    expect(json.sessions[0]?.sessionId).toBe(sessionId);
+    expect(json.sessions[0]?.status).toBe('active');
+    expect(json.sessions[1]?.status).toBe('completed');
+    expect(json.sessions[1]?.totalCostUsd).toBe(0.12);
+  });
+
+  it('manages pending follow-ups', () => {
+    const now = Date.now();
+    const doc = createTypedDoc(TaskConversationDocumentSchema, { doc: new LoroDoc() });
+
+    doc.pendingFollowUps.push({
+      messageId: 'followup-1',
+      role: 'user',
+      content: [{ type: 'text', text: 'Also fix the tests' }],
+      timestamp: now,
+      model: null,
+      machineId: null,
+      reasoningEffort: null,
+      permissionMode: null,
+      cwd: null,
+    });
+
+    doc.pendingFollowUps.push({
+      messageId: 'followup-2',
+      role: 'user',
+      content: [{ type: 'text', text: 'And update the docs' }],
+      timestamp: now + 500,
+      model: null,
+      machineId: null,
+      reasoningEffort: null,
+      permissionMode: null,
+      cwd: null,
+    });
+
+    const json = doc.toJSON();
+    expect(json.pendingFollowUps).toHaveLength(2);
+    expect(json.pendingFollowUps[0]?.messageId).toBe('followup-1');
+    if (json.pendingFollowUps[0]?.content[0]?.type === 'text') {
+      expect(json.pendingFollowUps[0].content[0].text).toBe('Also fix the tests');
+    }
+    expect(json.pendingFollowUps[1]?.messageId).toBe('followup-2');
+  });
+});
+
+describe('TaskReviewDocumentSchema', () => {
+  it('creates a valid typed document', () => {
+    const doc = createTypedDoc(TaskReviewDocumentSchema, { doc: new LoroDoc() });
+    const json = doc.toJSON();
+
+    expect(json).toHaveProperty('plans');
+    expect(json).toHaveProperty('planEditorDocs');
+    expect(json).toHaveProperty('diffComments');
+    expect(json).toHaveProperty('planComments');
+    expect(json).toHaveProperty('deliveredCommentIds');
+    expect(Array.isArray(json.plans)).toBe(true);
+    expect(Array.isArray(json.deliveredCommentIds)).toBe(true);
+  });
+
+  it('stores plan versions', () => {
+    const now = Date.now();
+    const doc = createTypedDoc(TaskReviewDocumentSchema, { doc: new LoroDoc() });
+
+    doc.plans.push({
+      planId: 'plan-1',
+      toolUseId: 'tu-exit-1',
+      markdown: '# Plan v1\n\n- Step 1: Read the code\n- Step 2: Fix the bug',
+      reviewStatus: 'pending',
+      reviewFeedback: null,
+      createdAt: now,
+    });
+
+    doc.plans.push({
+      planId: 'plan-2',
+      toolUseId: 'tu-exit-2',
+      markdown:
+        '# Plan v2\n\n- Step 1: Read the code\n- Step 2: Write tests\n- Step 3: Fix the bug',
+      reviewStatus: 'approved',
+      reviewFeedback: 'Looks good with the added tests',
+      createdAt: now + 30_000,
+    });
+
+    const json = doc.toJSON();
+    expect(json.plans).toHaveLength(2);
+    expect(json.plans[0]?.planId).toBe('plan-1');
+    expect(json.plans[0]?.reviewStatus).toBe('pending');
+    expect(json.plans[1]?.planId).toBe('plan-2');
+    expect(json.plans[1]?.reviewStatus).toBe('approved');
+    expect(json.plans[1]?.reviewFeedback).toBe('Looks good with the added tests');
+  });
+
+  it('manages diff comments via record', () => {
+    const now = Date.now();
+    const doc = createTypedDoc(TaskReviewDocumentSchema, { doc: new LoroDoc() });
+
+    doc.diffComments.set('cmt-r1', {
+      commentId: 'cmt-r1',
+      filePath: 'src/handler.ts',
+      lineNumber: 15,
+      side: 'new',
+      diffScope: 'working-tree',
+      lineContentHash: 'hash-r1',
+      body: 'This function should validate input',
+      authorType: 'human',
+      authorId: 'user-1',
+      createdAt: now,
+      resolvedAt: null,
+    });
+
+    doc.diffComments.set('cmt-r2', {
+      commentId: 'cmt-r2',
+      filePath: 'src/handler.ts',
+      lineNumber: 30,
+      side: 'old',
+      diffScope: 'last-turn',
+      lineContentHash: 'hash-r2',
+      body: 'Why was this removed?',
+      authorType: 'human',
+      authorId: 'user-1',
+      createdAt: now + 1000,
+      resolvedAt: null,
+    });
+
+    const json = doc.toJSON();
+    expect(Object.keys(json.diffComments)).toHaveLength(2);
+    expect(json.diffComments['cmt-r1']?.body).toBe('This function should validate input');
+    expect(json.diffComments['cmt-r2']?.side).toBe('old');
+
+    const entry = doc.diffComments.get('cmt-r1');
+    if (entry) {
+      doc.diffComments.set('cmt-r1', { ...entry, resolvedAt: now + 5000 });
+    }
+    expect(doc.toJSON().diffComments['cmt-r1']?.resolvedAt).toBe(now + 5000);
+  });
+
+  it('manages plan comments via record', () => {
+    const now = Date.now();
+    const doc = createTypedDoc(TaskReviewDocumentSchema, { doc: new LoroDoc() });
+
+    doc.planComments.set('pcmt-1', {
+      commentId: 'pcmt-1',
+      planId: 'plan-1',
+      from: 10,
+      to: 45,
+      body: 'Step 2 needs more detail',
+      authorType: 'human',
+      authorId: 'user-1',
+      createdAt: now,
+      resolvedAt: null,
+    });
+
+    doc.planComments.set('pcmt-2', {
+      commentId: 'pcmt-2',
+      planId: 'plan-1',
+      from: 50,
+      to: 80,
+      body: 'Consider edge cases here',
+      authorType: 'agent',
+      authorId: 'claude-1',
+      createdAt: now + 2000,
+      resolvedAt: null,
+    });
+
+    const json = doc.toJSON();
+    expect(Object.keys(json.planComments)).toHaveLength(2);
+    expect(json.planComments['pcmt-1']?.body).toBe('Step 2 needs more detail');
+    expect(json.planComments['pcmt-1']?.planId).toBe('plan-1');
+    expect(json.planComments['pcmt-2']?.authorType).toBe('agent');
+
+    const entry = doc.planComments.get('pcmt-2');
+    if (entry) {
+      doc.planComments.set('pcmt-2', { ...entry, resolvedAt: now + 10_000 });
+    }
+    expect(doc.toJSON().planComments['pcmt-2']?.resolvedAt).toBe(now + 10_000);
+  });
+
+  it('tracks delivered comment IDs', () => {
+    const doc = createTypedDoc(TaskReviewDocumentSchema, { doc: new LoroDoc() });
+
+    doc.deliveredCommentIds.push('cmt-r1');
+    doc.deliveredCommentIds.push('cmt-r2');
+    doc.deliveredCommentIds.push('pcmt-1');
+
+    const json = doc.toJSON();
+    expect(json.deliveredCommentIds).toHaveLength(3);
+    expect(json.deliveredCommentIds[0]).toBe('cmt-r1');
+    expect(json.deliveredCommentIds[1]).toBe('cmt-r2');
+    expect(json.deliveredCommentIds[2]).toBe('pcmt-1');
   });
 });

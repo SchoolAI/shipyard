@@ -80,10 +80,33 @@ export function parseEpochParam(searchParams: URLSearchParams): number | null {
  * Example: buildDocumentId('task', 'abc123', 2) → "task:abc123:2"
  */
 export function buildDocumentId(prefix: string, key: string, epoch: number): string {
+  if (!prefix || !key) {
+    throw new Error(
+      `Document ID prefix and key must be non-empty: prefix="${prefix}", key="${key}"`
+    );
+  }
   if (prefix.includes(':') || key.includes(':')) {
     throw new Error(`Document ID parts must not contain colons: prefix="${prefix}", key="${key}"`);
   }
+  if (!Number.isInteger(epoch) || epoch < 1) {
+    throw new Error(`Document ID epoch must be a positive integer: ${epoch}`);
+  }
   return `${prefix}:${key}:${epoch}`;
+}
+
+/** Build an epoch-versioned task-meta document ID. */
+export function buildTaskMetaDocId(taskId: string, epoch: number): string {
+  return buildDocumentId('task-meta', taskId, epoch);
+}
+
+/** Build an epoch-versioned task-conv document ID. */
+export function buildTaskConvDocId(taskId: string, epoch: number): string {
+  return buildDocumentId('task-conv', taskId, epoch);
+}
+
+/** Build an epoch-versioned task-review document ID. */
+export function buildTaskReviewDocId(taskId: string, epoch: number): string {
+  return buildDocumentId('task-review', taskId, epoch);
 }
 
 /**

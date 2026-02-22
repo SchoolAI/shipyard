@@ -10,6 +10,9 @@ export {
 export type { EpochCloseCode } from './epoch.js';
 export {
   buildDocumentId,
+  buildTaskConvDocId,
+  buildTaskMetaDocId,
+  buildTaskReviewDocId,
   DEFAULT_EPOCH,
   EPOCH_CLOSE_CODES,
   formatEpochCloseReason,
@@ -87,7 +90,9 @@ export type {
   ImageSourceType,
   Message,
   MutableEpochDocument,
-  MutableTaskDocument,
+  MutableTaskConversationDocument,
+  MutableTaskMetaDocument,
+  MutableTaskReviewDocument,
   PermissionDecision,
   PermissionMode,
   PermissionRequest,
@@ -99,9 +104,14 @@ export type {
   SessionEntry,
   SessionState,
   SupportedImageMediaType,
-  TaskDocument,
-  TaskDocumentShape,
+  TaskConversationDocument,
+  TaskConversationDocumentShape,
+  TaskDocHandles,
   TaskMeta,
+  TaskMetaDocument,
+  TaskMetaDocumentShape,
+  TaskReviewDocument,
+  TaskReviewDocumentShape,
   ToolRiskLevel,
 } from './shapes.js';
 export {
@@ -131,7 +141,9 @@ export {
   SESSION_STATES,
   SessionEntryShape,
   SUPPORTED_IMAGE_MEDIA_TYPES,
-  TaskDocumentSchema,
+  TaskConversationDocumentSchema,
+  TaskMetaDocumentSchema,
+  TaskReviewDocumentSchema,
   TERMINAL_TASK_STATES,
   TOOL_RISK_LEVELS,
 } from './shapes.js';

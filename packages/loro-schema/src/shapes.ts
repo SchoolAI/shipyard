@@ -1,4 +1,4 @@
-import { type Infer, type InferMutableType, Shape } from '@loro-extended/change';
+import { type Infer, type InferMutableType, Shape, type TypedDoc } from '@loro-extended/change';
 
 /**
  * Epoch document schema.
@@ -191,36 +191,48 @@ export const PlanCommentShape = Shape.plain.struct({
   resolvedAt: Shape.plain.number().nullable(),
 });
 
+const TaskMetaStructShape = Shape.struct({
+  id: Shape.plain.string(),
+  title: Shape.plain.string(),
+  status: Shape.plain.string(...A2A_TASK_STATES),
+  createdAt: Shape.plain.number(),
+  updatedAt: Shape.plain.number(),
+});
+
 /**
- * Task document schema.
- * One doc per task. Contains metadata, conversation, and session tracking.
- * Document ID pattern: "task:{taskId}:{epoch}"
+ * Task meta document schema.
+ * Lightweight metadata — changes rarely (~200 bytes).
+ * Permission boundary: only owner/agent can write.
+ * Document ID pattern: "task-meta:{taskId}:{epoch}"
  */
-export const TaskDocumentSchema = Shape.doc({
-  meta: Shape.struct({
-    id: Shape.plain.string(),
-    title: Shape.plain.string(),
-    status: Shape.plain.string(...A2A_TASK_STATES),
-    createdAt: Shape.plain.number(),
-    updatedAt: Shape.plain.number(),
-  }),
+export const TaskMetaDocumentSchema = Shape.doc({
+  meta: TaskMetaStructShape,
+});
 
+/**
+ * Task conversation document schema.
+ * Large and growing — messages, tool calls, thinking blocks.
+ * Permission boundary: configurable per collaborator (some get write, others read-only).
+ * Document ID pattern: "task-conv:{taskId}:{epoch}"
+ */
+export const TaskConversationDocumentSchema = Shape.doc({
   conversation: Shape.list(MessageShape),
-
   pendingFollowUps: Shape.list(MessageShape),
-
   sessions: Shape.list(SessionEntryShape),
-
   diffState: DiffStateShape,
+});
 
+/**
+ * Task review document schema.
+ * Medium size — plans, comments, grows with review activity.
+ * Permission boundary: all collaborators can write (review is the collaboration surface).
+ * Document ID pattern: "task-review:{taskId}:{epoch}"
+ */
+export const TaskReviewDocumentSchema = Shape.doc({
   plans: Shape.list(PlanVersionShape),
-
   planEditorDocs: Shape.record(Shape.any()),
-
   diffComments: Shape.record(DiffCommentShape),
-
   planComments: Shape.record(PlanCommentShape),
-
   deliveredCommentIds: Shape.list(Shape.plain.string()),
 });
 
@@ -228,11 +240,27 @@ export type EpochDocumentShape = typeof EpochDocumentSchema;
 export type EpochDocument = Infer<typeof EpochDocumentSchema>;
 export type MutableEpochDocument = InferMutableType<typeof EpochDocumentSchema>;
 
-export type TaskDocumentShape = typeof TaskDocumentSchema;
-export type TaskDocument = Infer<typeof TaskDocumentSchema>;
-export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
+export type TaskMetaDocumentShape = typeof TaskMetaDocumentSchema;
+export type TaskMetaDocument = Infer<typeof TaskMetaDocumentSchema>;
+export type MutableTaskMetaDocument = InferMutableType<typeof TaskMetaDocumentSchema>;
 
-export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
+export type TaskConversationDocumentShape = typeof TaskConversationDocumentSchema;
+export type TaskConversationDocument = Infer<typeof TaskConversationDocumentSchema>;
+export type MutableTaskConversationDocument = InferMutableType<
+  typeof TaskConversationDocumentSchema
+>;
+
+export type TaskReviewDocumentShape = typeof TaskReviewDocumentSchema;
+export type TaskReviewDocument = Infer<typeof TaskReviewDocumentSchema>;
+export type MutableTaskReviewDocument = InferMutableType<typeof TaskReviewDocumentSchema>;
+
+export interface TaskDocHandles {
+  meta: TypedDoc<TaskMetaDocumentShape>;
+  conv: TypedDoc<TaskConversationDocumentShape>;
+  review: TypedDoc<TaskReviewDocumentShape>;
+}
+
+export type TaskMeta = Infer<typeof TaskMetaDocumentSchema.shapes.meta>;
 export type ContentBlock = Infer<typeof ContentBlockShape>;
 export type Message = Infer<typeof MessageShape>;
 export type ContentBlockType = (typeof CONTENT_BLOCK_TYPES)[number];
