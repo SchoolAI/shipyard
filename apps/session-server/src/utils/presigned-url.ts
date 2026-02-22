@@ -5,12 +5,14 @@
 import type { PresignedUrlPayload } from '../auth/types';
 import { hmacSign, hmacVerify } from './crypto';
 
+const VALID_ROLES = new Set(['collaborator-full', 'collaborator-review', 'viewer']);
+
 /**
  * Type guard for PresignedUrlPayload.
  */
 function isValidPresignedUrlPayload(obj: unknown): obj is PresignedUrlPayload {
   if (!obj || typeof obj !== 'object') return false;
-  return (
+  const base =
     'roomId' in obj &&
     typeof obj.roomId === 'string' &&
     obj.roomId.length > 0 &&
@@ -21,8 +23,12 @@ function isValidPresignedUrlPayload(obj: unknown): obj is PresignedUrlPayload {
     typeof obj.inviterId === 'string' &&
     obj.inviterId.length > 0 &&
     'exp' in obj &&
-    typeof obj.exp === 'number'
-  );
+    typeof obj.exp === 'number';
+  if (!base) return false;
+  if ('role' in obj && obj.role !== undefined) {
+    return typeof obj.role === 'string' && VALID_ROLES.has(obj.role);
+  }
+  return true;
 }
 
 /**

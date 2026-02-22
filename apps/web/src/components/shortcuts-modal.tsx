@@ -86,7 +86,7 @@ export function ShortcutsModal() {
     <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen} isDismissable>
       <Modal.Container placement="center" size="lg">
         <Modal.Dialog aria-labelledby="shortcuts-dialog-title">
-          <div className="bg-overlay rounded-xl p-6">
+          <div className="bg-overlay rounded-xl p-6 max-h-[80dvh] overflow-y-auto">
             <h2 className="text-base font-medium text-foreground mb-5" id="shortcuts-dialog-title">
               Keyboard shortcuts
             </h2>
@@ -94,9 +94,11 @@ export function ShortcutsModal() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10">
               <div className="space-y-5">
                 <ShortcutSection context="global" shortcuts={sections.global} />
+              </div>
+              <div className="space-y-5">
+                <ShortcutSection context="navigation" shortcuts={sections.navigation} />
                 <ShortcutSection context="composer" shortcuts={sections.composer} />
               </div>
-              <ShortcutSection context="navigation" shortcuts={sections.navigation} />
             </div>
 
             <p className="mt-5 text-xs text-muted/40 text-center">

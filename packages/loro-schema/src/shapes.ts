@@ -104,6 +104,8 @@ export const MessageShape = Shape.plain.struct({
   reasoningEffort: Shape.plain.string(...REASONING_EFFORTS).nullable(),
   permissionMode: Shape.plain.string(...PERMISSION_MODES).nullable(),
   cwd: Shape.plain.string().nullable(),
+  authorId: Shape.plain.string().nullable(),
+  authorName: Shape.plain.string().nullable(),
 });
 
 const DiffFileShape = Shape.plain.struct({

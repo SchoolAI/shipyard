@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FeedbackProvider } from '../contexts/feedback-context';
 import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
+import { useCollabLifecycle } from '../hooks/use-collab-lifecycle';
 import { useCreateWorktree } from '../hooks/use-create-worktree';
 import { useEnhancePrompt } from '../hooks/use-enhance-prompt';
 import {
@@ -50,7 +51,12 @@ import { useTaskIndex } from '../hooks/use-task-index';
 import { useVisualViewport } from '../hooks/use-visual-viewport';
 import { useVoiceInput } from '../hooks/use-voice-input';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
-import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
+import {
+  useCollabWebRtcAdapter,
+  useRepo,
+  useSharedTaskIds,
+  useWebRtcAdapter,
+} from '../providers/repo-provider';
 import { useAuthStore, useMessageStore, useTaskStore, useUIStore } from '../stores';
 import { formatBrowserFeedback } from '../utils/format-feedback';
 import { navigateFromSettings, navigateToSettings } from '../utils/url-sync';
@@ -60,6 +66,7 @@ import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
+import { CollabBanner } from './collab-banner';
 import { CommandPalette } from './command-palette';
 import type { ReasoningLevel } from './composer/reasoning-effort';
 import { StatusBar } from './composer/status-bar';
@@ -72,13 +79,12 @@ import type { TerminalPanelHandle } from './panels/terminal-panel';
 import { TerminalPanel } from './panels/terminal-panel';
 import { PermissionCard } from './permission-card';
 import { SettingsPage } from './settings-page';
+import { ShareTaskModal } from './share-task-modal';
 import { ShortcutsModal } from './shortcuts-modal';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { WorktreeCreationModal } from './worktree-creation-modal';
 import { WorktreeProgressCard } from './worktree-progress-card';
-
-const useLoro = import.meta.env.VITE_DATA_SOURCE === 'loro';
 
 const VALID_EFFORTS: readonly string[] = REASONING_EFFORTS;
 const VALID_MODES: readonly string[] = PERMISSION_MODES;
@@ -173,22 +179,6 @@ function buildAutoAttachFeedback(
   return { fullMessage, commentIdsToDeliver: ids };
 }
 
-/** Wrap a plain text + images into ContentBlock[] for the legacy message store path. */
-function toContentBlocks(text: string, images?: SubmitPayload['images']): ContentBlock[] {
-  const blocks: ContentBlock[] = [];
-  if (text) blocks.push({ type: 'text' as const, text });
-  if (images) {
-    for (const img of images) {
-      blocks.push({
-        type: 'image' as const,
-        id: crypto.randomUUID(),
-        source: { type: 'base64' as const, mediaType: img.mediaType, data: img.data },
-      });
-    }
-  }
-  return blocks;
-}
-
 function writeCrdtDocs(
   repo: ReturnType<typeof useRepo>,
   opts: {
@@ -205,6 +195,8 @@ function writeCrdtDocs(
     selectedEnvironmentPath: string | null | undefined;
     homeDir: string | null | undefined;
     isAgentRunning: boolean;
+    authUserId: string | null;
+    authUserName: string | null;
   }
 ) {
   const now = Date.now();
@@ -222,11 +214,9 @@ function writeCrdtDocs(
     selectedEnvironmentPath,
     homeDir,
     isAgentRunning,
+    authUserId,
+    authUserName,
   } = opts;
-
-  const metaDocId = buildTaskMetaDocId(currentTaskId, DEFAULT_EPOCH);
-  const metaDocHandle = repo.get(metaDocId, TaskMetaDocumentSchema);
-  const isNewTask = metaDocHandle.loroDoc.opCount() === 0;
 
   const { fullMessage, commentIdsToDeliver } = buildAutoAttachFeedback(
     message,
@@ -234,6 +224,10 @@ function writeCrdtDocs(
     planComments,
     deliveredCommentIds
   );
+
+  const metaDocId = buildTaskMetaDocId(currentTaskId, DEFAULT_EPOCH);
+  const metaDocHandle = repo.get(metaDocId, TaskMetaDocumentSchema);
+  const isNewTask = metaDocHandle.loroDoc.opCount() === 0;
 
   change(metaDocHandle.doc, (draft) => {
     if (isNewTask) {
@@ -280,6 +274,8 @@ function writeCrdtDocs(
       reasoningEffort,
       permissionMode,
       cwd: selectedEnvironmentPath ?? homeDir ?? null,
+      authorId: authUserId ?? null,
+      authorName: authUserName ?? null,
     };
 
     if (isAgentRunning) {
@@ -344,6 +340,17 @@ function getSubmitDisabledReason(
   if (canSubmit) return undefined;
   if (connectionState !== 'connected') return 'Connecting to Shipyard...';
   return 'Select a machine to send messages';
+}
+
+/** Resolve (or create) the task ID for a new submission. */
+function resolveTaskId(
+  activeTaskId: string | null,
+  setActiveTask: (id: string | null) => void
+): string {
+  if (activeTaskId) return activeTaskId;
+  const newId = generateTaskId();
+  setActiveTask(newId);
+  return newId;
 }
 
 const SUGGESTION_CARDS = [
@@ -436,7 +443,6 @@ export function ChatPage() {
 function ChatPageInner() {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
-  const messagesByTask = useMessageStore((s) => s.messagesByTask);
   const isTerminalOpen = useUIStore((s) => s.isTerminalOpen);
   const activeSidePanel = useUIStore((s) => s.activeSidePanel);
   const isSettingsOpen = useUIStore((s) => s.isSettingsOpen);
@@ -498,6 +504,8 @@ function ChatPageInner() {
 
   const repo = useRepo();
   const webrtcAdapter = useWebRtcAdapter();
+  const collabAdapter = useCollabWebRtcAdapter();
+  const sharedTaskIds = useSharedTaskIds();
   const { peerState, createTerminalChannel } = useWebRTCSync({
     connection,
     webrtcAdapter,
@@ -512,11 +520,55 @@ function ChatPageInner() {
   const diffScope = useUIStore((s) => s.diffScope);
 
   const taskStatus = loroTask.meta?.status;
+  const taskUpdatedAt = loroTask.meta?.updatedAt ?? 0;
+  const isEmptyMetaDoc = !loroTask.meta?.id;
+
+  /**
+   * Timeout for the 'submitted' status.
+   *
+   * When the browser writes status='submitted' and sends notify-task, the daemon
+   * should transition to 'starting' within seconds. If it does not (daemon offline,
+   * WebRTC channel dropped, signaling relay failed), the status stays 'submitted'
+   * indefinitely. This timeout treats a stuck 'submitted' as equivalent to the
+   * daemon never having received the task, and stops showing the running card.
+   *
+   * The CRDT status is NOT modified -- we only suppress the browser-side indicator.
+   * If the daemon eventually processes the task, its CRDT writes will override
+   * 'submitted' and the card will reappear correctly.
+   *
+   * We use `taskUpdatedAt` as a dependency so that re-submitting while already
+   * in 'submitted' state resets the timer (the CRDT updatedAt changes on each
+   * writeCrdtDocs call).
+   */
+  const SUBMITTED_TIMEOUT_MS = 30_000;
+  const [submittedTimedOut, setSubmittedTimedOut] = useState(false);
+
+  useEffect(() => {
+    setSubmittedTimedOut(false);
+  }, [activeTaskId]);
+
+  useEffect(() => {
+    if (taskStatus !== 'submitted') {
+      setSubmittedTimedOut(false);
+      return;
+    }
+    setSubmittedTimedOut(false);
+    const timer = setTimeout(() => {
+      setSubmittedTimedOut(true);
+    }, SUBMITTED_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [taskStatus, taskUpdatedAt]);
+
   const isAgentRunning =
-    taskStatus === 'submitted' || taskStatus === 'starting' || taskStatus === 'working';
-  const isAgentFailed = taskStatus === 'failed';
+    !isEmptyMetaDoc &&
+    (taskStatus === 'submitted' || taskStatus === 'starting' || taskStatus === 'working') &&
+    !submittedTimedOut;
+  const isAgentFailed =
+    (!isEmptyMetaDoc && taskStatus === 'failed') ||
+    (taskStatus === 'submitted' && submittedTimedOut);
 
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
+  const activeEntry = activeTaskId ? taskIndex[activeTaskId] : undefined;
   const taskList = useMemo(
     () => Object.values(taskIndex).sort((a, b) => b.updatedAt - a.updatedAt),
     [taskIndex]
@@ -554,10 +606,6 @@ function ChatPageInner() {
     (d: { userSettings: { composerPermission: string | null } }) =>
       d.userSettings.composerPermission
   );
-
-  const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
-
-  const lastSubmittedModelRef = useRef<string | null>(null);
 
   const [stoppingTaskId, setStoppingTaskId] = useState<string | null>(null);
   const isStopping = stoppingTaskId === activeTaskId;
@@ -644,9 +692,7 @@ function ChatPageInner() {
     return map;
   }, [availableModels]);
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: message building has inherent branching for Loro vs store, thinking indicators, and queued messages
   const messages: ChatMessageData[] = useMemo(() => {
-    /** Convert a raw model ID like "claude-opus-4-6" to a display label. */
     function resolveModelLabel(modelId: string | null | undefined): string | undefined {
       if (!modelId) return undefined;
       const known = modelLabelMap.get(modelId);
@@ -662,51 +708,37 @@ function ChatPageInner() {
         .replace(/\.$/, '');
     }
 
-    let raw: ChatMessageData[];
+    const raw: ChatMessageData[] = loroTask.conversation.map((msg) => ({
+      id: msg.messageId ?? crypto.randomUUID(),
+      role: msg.role,
+      content: msg.content,
+      agentName: msg.role === 'assistant' ? resolveModelLabel(msg.model) : undefined,
+    }));
 
-    if (
-      useLoro &&
-      ((loroTask.conversation?.length ?? 0) > 0 || (loroTask.pendingFollowUps?.length ?? 0) > 0)
-    ) {
-      raw = loroTask.conversation.map((msg) => ({
-        id: msg.messageId ?? crypto.randomUUID(),
-        role: msg.role,
-        content: msg.content,
-        agentName: msg.role === 'assistant' ? resolveModelLabel(msg.model) : undefined,
-      }));
-
-      const status = loroTask.meta?.status;
-      const isInFlight = status === 'submitted' || status === 'starting' || status === 'working';
-      const lastMsg = raw[raw.length - 1];
-      if (isInFlight && lastMsg?.role === 'user') {
-        raw.push({
-          id: '__thinking__',
-          role: 'assistant' as const,
-          content: [],
-          isThinking: true,
-          agentName: resolveModelLabel(lastSubmittedModelRef.current),
-        });
-      }
-
-      for (const pending of loroTask.pendingFollowUps) {
-        raw.push({
-          id: `queued-${pending.messageId}`,
-          role: pending.role,
-          content: pending.content,
-          isQueued: true,
-        });
-      }
-    } else {
-      raw =
-        storeMessages?.map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: toContentBlocks(m.content),
-          isThinking: m.isThinking,
-        })) ?? [];
+    const status = loroTask.meta?.status;
+    const metaIsEmpty = !loroTask.meta?.id;
+    const isInFlight =
+      !metaIsEmpty && (status === 'submitted' || status === 'starting' || status === 'working');
+    const lastMsg = raw[raw.length - 1];
+    if (isInFlight && lastMsg?.role === 'user') {
+      raw.push({
+        id: '__thinking__',
+        role: 'assistant' as const,
+        content: [],
+        isThinking: true,
+        agentName: undefined,
+      });
     }
 
-    /** Group consecutive messages with the same role into a single entry. */
+    for (const pending of loroTask.pendingFollowUps) {
+      raw.push({
+        id: `queued-${pending.messageId}`,
+        role: pending.role,
+        content: pending.content,
+        isQueued: true,
+      });
+    }
+
     const grouped: ChatMessageData[] = [];
     for (const msg of raw) {
       const last = grouped[grouped.length - 1];
@@ -725,17 +757,10 @@ function ChatPageInner() {
       }
     }
     return grouped;
-  }, [
-    loroTask.conversation,
-    loroTask.pendingFollowUps,
-    loroTask.meta?.status,
-    storeMessages,
-    modelLabelMap,
-  ]);
+  }, [loroTask.conversation, loroTask.pendingFollowUps, loroTask.meta?.status, modelLabelMap]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
-  const demoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const composerRef = useRef<ChatComposerHandle>(null);
   const terminalRef = useRef<TerminalPanelHandle>(null);
   const sidePanelRef = useRef<SidePanelHandle>(null);
@@ -796,6 +821,18 @@ function ChatPageInner() {
     },
     [roomTypedDoc]
   );
+
+  const isShareModalOpen = useUIStore((s) => s.isShareModalOpen);
+  const setIsShareModalOpen = useUIStore((s) => s.setShareModalOpen);
+
+  const collab = useCollabLifecycle({
+    authToken,
+    activeTaskId,
+    setActiveTask,
+    collabAdapter,
+    sharedTaskIds,
+    hasPersonalConnection: !!selectedMachineId && connectionState === 'connected',
+  });
 
   const [isWorktreeModalOpen, setIsWorktreeModalOpen] = useState(false);
   const [worktreeProgress, setWorktreeProgress] = useState<{
@@ -960,10 +997,6 @@ function ChatPageInner() {
     taskHasUserMessage,
   ]);
 
-  useEffect(() => {
-    return () => clearTimeout(demoTimerRef.current);
-  }, []);
-
   useFocusTarget({
     id: 'terminal',
     ref: terminalRef,
@@ -1024,8 +1057,9 @@ function ChatPageInner() {
   }, [activeTaskId, isTerminalOpen, focusTarget, scheduleFocus, cancelPending]);
 
   const handleNewTask = useCallback(() => {
+    collab.leave();
     setActiveTask(null);
-  }, [setActiveTask]);
+  }, [setActiveTask, collab]);
 
   const handleNavigateNextTask = useCallback(() => {
     const currentIndex = taskList.findIndex((t) => t.taskId === activeTaskId);
@@ -1212,6 +1246,9 @@ function ChatPageInner() {
     onStopAgent: useCallback(() => {
       if (isAgentRunningRef.current) handleStopAgent();
     }, [handleStopAgent]),
+    onShare: useCallback(() => {
+      if (activeTaskId) setIsShareModalOpen(true);
+    }, [activeTaskId]),
   });
 
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -1285,55 +1322,39 @@ function ChatPageInner() {
     return unsub;
   }, [connection, activeTaskId, selectedMachineId]);
 
+  const canSubmit =
+    (!!selectedMachineId && connectionState === 'connected') ||
+    (collab.connectionState === 'connected' && !!collab.taskId);
+  const submitDisabledReason =
+    collab.connectionState === 'connected'
+      ? undefined
+      : getSubmitDisabledReason(canSubmit, connectionState);
+
   const handleSubmit = useCallback(
     (payload: SubmitPayload) => {
-      if (!selectedMachineId || connectionState !== 'connected') return;
+      if (!canSubmit) return;
       cancelEnhance();
       const { message, model, reasoningEffort, permissionMode } = payload;
-      lastSubmittedModelRef.current = model || null;
-      const taskId = generateTaskId();
-      let currentTaskId: string;
 
-      if (activeTaskId) {
-        currentTaskId = activeTaskId;
-      } else {
-        currentTaskId = taskId;
-        setActiveTask(currentTaskId);
-        useMessageStore.getState().clearMessages(currentTaskId);
-      }
+      const currentTaskId = resolveTaskId(activeTaskId, setActiveTask);
 
-      const msgStore = useMessageStore.getState();
-
-      msgStore.addMessage(currentTaskId, {
-        taskId: currentTaskId,
-        role: 'user',
-        content: message,
+      writeCrdtDocs(repo, {
+        currentTaskId,
+        message,
+        payload,
+        model,
+        reasoningEffort,
+        permissionMode,
+        diffComments,
+        planComments,
+        deliveredCommentIds,
+        selectedMachineId: selectedMachineId ?? null,
+        selectedEnvironmentPath,
+        homeDir,
+        isAgentRunning: isAgentRunningRef.current,
+        authUserId: authUser?.id ?? null,
+        authUserName: authUser?.displayName ?? null,
       });
-
-      const thinkingId = msgStore.addMessage(currentTaskId, {
-        taskId: currentTaskId,
-        role: 'assistant',
-        content: '',
-        isThinking: true,
-      });
-
-      if (useLoro && repo) {
-        writeCrdtDocs(repo, {
-          currentTaskId,
-          message,
-          payload,
-          model,
-          reasoningEffort,
-          permissionMode,
-          diffComments,
-          planComments,
-          deliveredCommentIds,
-          selectedMachineId,
-          selectedEnvironmentPath,
-          homeDir,
-          isAgentRunning: isAgentRunningRef.current,
-        });
-      }
 
       if (connection && selectedMachineId) {
         connection.send({
@@ -1342,22 +1363,14 @@ function ChatPageInner() {
           machineId: selectedMachineId,
           taskId: currentTaskId,
         });
-      } else {
-        demoTimerRef.current = setTimeout(() => {
-          useMessageStore.getState().updateMessage(currentTaskId, thinkingId, {
-            isThinking: false,
-            content:
-              'No machine connected. Select a machine and ensure the connection is active to send tasks to an agent.',
-          });
-        }, 500);
       }
     },
     [
       activeTaskId,
       setActiveTask,
       cancelEnhance,
+      canSubmit,
       connection,
-      connectionState,
       selectedMachineId,
       selectedEnvironmentPath,
       homeDir,
@@ -1365,6 +1378,7 @@ function ChatPageInner() {
       diffComments,
       planComments,
       deliveredCommentIds,
+      authUser,
     ]
   );
 
@@ -1415,12 +1429,6 @@ function ChatPageInner() {
     return latestUpdate > tasksLastViewedAt;
   }, [activeSidePanel, todoItems, tasksLastViewedAt]);
 
-  const canSubmit =
-    !!selectedMachineId &&
-    connectionState === 'connected' &&
-    machines.some((m) => m.machineId === selectedMachineId);
-  const submitDisabledReason = getSubmitDisabledReason(canSubmit, connectionState);
-
   const hasMessages = messages.length > 0;
 
   const selectedEnv = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
@@ -1444,6 +1452,14 @@ function ChatPageInner() {
       >
         <CommandPalette />
         <ShortcutsModal />
+        <ShareTaskModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          taskId={activeTaskId}
+          taskTitle={activeEntry?.title ?? ''}
+          participants={collab.participants}
+          onRoomCreated={collab.join}
+        />
         <WorktreeCreationModal
           isOpen={isWorktreeModalOpen}
           onClose={() => setIsWorktreeModalOpen(false)}
@@ -1456,12 +1472,21 @@ function ChatPageInner() {
         <Sidebar />
         <div className="flex flex-col flex-1 min-w-0 min-h-0" tabIndex={-1}>
           <TopBar
+            activeTaskId={activeTaskId}
             onToggleTerminal={toggleTerminal}
             onToggleSidePanel={useCallback(() => toggleSidePanel('diff'), [toggleSidePanel])}
             hasUnviewedDiff={hasUnviewedDiff}
             totalCostUsd={totalCostUsd}
             todoItems={todoItems}
+            participants={collab.participants}
+            onShare={activeTaskId ? () => setIsShareModalOpen(true) : undefined}
           />
+          {collab.role && !collab.isOwner && (
+            <CollabBanner
+              ownerUsername={collab.participants.find((p) => p.role === 'owner')?.username ?? null}
+              currentRole={collab.role ?? 'viewer'}
+            />
+          )}
 
           <main id="main-content" className="flex flex-col flex-1 min-h-0">
             {isSettingsOpen ? (
@@ -1591,8 +1616,8 @@ function ChatPageInner() {
                     <div className="mb-2">
                       <AgentStatusCard
                         status="running"
-                        modelName={lastSubmittedModelRef.current ?? undefined}
-                        onStop={handleStopAgent}
+                        modelName={undefined}
+                        onStop={connection && selectedMachineId ? handleStopAgent : undefined}
                         isStopping={isStopping}
                       />
                     </div>
@@ -1601,42 +1626,53 @@ function ChatPageInner() {
                     <div className="mb-2">
                       <AgentStatusCard
                         status="failed"
-                        modelName={lastSubmittedModelRef.current ?? undefined}
+                        modelName={undefined}
                         errorMessage={
-                          loroTask.sessions?.[loroTask.sessions.length - 1]?.error ?? undefined
+                          submittedTimedOut
+                            ? 'No response from daemon. Check that your machine is connected.'
+                            : (loroTask.sessions?.[loroTask.sessions.length - 1]?.error ??
+                              undefined)
                         }
                         onDismiss={() => setDismissedFailedTaskId(activeTaskId)}
                       />
                     </div>
                   )}
-                  <ChatComposer
-                    key={activeTaskId ?? 'new'}
-                    ref={composerRef}
-                    onSubmit={handleSubmit}
-                    onClearChat={handleClearChat}
-                    availableModels={availableModels}
-                    availableEnvironments={availableEnvironments}
-                    onEnvironmentSelect={setSelectedEnvironmentPath}
-                    selectedModelId={composerModel}
-                    onModelChange={setComposerModel}
-                    reasoningLevel={composerReasoning}
-                    onReasoningChange={setComposerReasoning}
-                    permissionMode={composerPermission}
-                    onPermissionChange={setComposerPermission}
-                    isSubmitDisabled={!canSubmit}
-                    submitDisabledReason={submitDisabledReason}
-                    isVoiceRecording={voiceInput.isListening}
-                    isVoiceSupported={voiceInput.isSupported}
-                    onVoiceToggle={voiceInput.toggle}
-                    voiceInterimText={voiceInput.interimText}
-                    isEnhancing={isEnhancing}
-                    onEnhance={handleEnhance}
-                    onCreateWorktree={handleOpenWorktreeModal}
-                    isEnvironmentLocked={taskHasUserMessage}
-                    isAgentRunning={isAgentRunning}
-                    onInterruptAndSend={handleInterruptAndSend}
-                    onStopAgent={handleStopAgent}
-                  />
+                  {collab.isReadOnly ? (
+                    <div className="w-full pb-1">
+                      <div className="bg-surface rounded-xl border border-separator px-4 py-3 text-center">
+                        <span className="text-sm text-muted">Read-only access</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <ChatComposer
+                      key={activeTaskId ?? 'new'}
+                      ref={composerRef}
+                      onSubmit={handleSubmit}
+                      onClearChat={handleClearChat}
+                      availableModels={availableModels}
+                      availableEnvironments={availableEnvironments}
+                      onEnvironmentSelect={setSelectedEnvironmentPath}
+                      selectedModelId={composerModel}
+                      onModelChange={setComposerModel}
+                      reasoningLevel={composerReasoning}
+                      onReasoningChange={setComposerReasoning}
+                      permissionMode={composerPermission}
+                      onPermissionChange={setComposerPermission}
+                      isSubmitDisabled={!canSubmit}
+                      submitDisabledReason={submitDisabledReason}
+                      isVoiceRecording={voiceInput.isListening}
+                      isVoiceSupported={voiceInput.isSupported}
+                      onVoiceToggle={voiceInput.toggle}
+                      voiceInterimText={voiceInput.interimText}
+                      isEnhancing={isEnhancing}
+                      onEnhance={handleEnhance}
+                      onCreateWorktree={handleOpenWorktreeModal}
+                      isEnvironmentLocked={taskHasUserMessage}
+                      isAgentRunning={isAgentRunning}
+                      onInterruptAndSend={handleInterruptAndSend}
+                      onStopAgent={handleStopAgent}
+                    />
+                  )}
                   <StatusBar
                     connectionState={connectionState}
                     machines={machines}

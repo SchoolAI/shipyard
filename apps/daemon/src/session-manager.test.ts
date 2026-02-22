@@ -1740,6 +1740,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Hello world');
@@ -1759,6 +1761,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('First part\nSecond part');
@@ -1775,6 +1779,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
       taskDocs.conv.conversation.push({
         messageId: 'msg-agent-1',
@@ -1786,6 +1792,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
       taskDocs.conv.conversation.push({
         messageId: 'msg-user-2',
@@ -1797,6 +1805,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Follow-up question');
@@ -1813,6 +1823,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBeNull();
@@ -1838,6 +1850,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('With a tool result');
@@ -1860,6 +1874,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       expect(manager.getLatestUserContentBlocks()).toEqual([{ type: 'text', text: 'Hello world' }]);
@@ -1883,6 +1899,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       const blocks = manager.getLatestUserContentBlocks();
@@ -1912,6 +1930,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       const blocks = manager.getLatestUserContentBlocks();
@@ -1948,6 +1968,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       const blocks = manager.getLatestUserContentBlocks();
@@ -1971,6 +1993,8 @@ describe('SessionManager', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
 
       expect(manager.getLatestUserContentBlocks()).toBeNull();

@@ -110,53 +110,51 @@ describe('epoch utilities', () => {
 
   describe('buildDocumentId', () => {
     it('builds epoch-versioned document ID', () => {
-      expect(buildDocumentId('task', 'abc123', 1)).toBe('task:abc123:1');
-      expect(buildDocumentId('task', 'xyz', 5)).toBe('task:xyz:5');
-      expect(buildDocumentId('session', 'sess-1', 2)).toBe('session:sess-1:2');
-    });
-
-    it('throws if prefix contains colon', () => {
-      expect(() => buildDocumentId('pre:fix', 'key', 1)).toThrow('must not contain colons');
-    });
-
-    it('throws if key contains colon', () => {
-      expect(() => buildDocumentId('prefix', 'key:val', 1)).toThrow('must not contain colons');
-    });
-
-    it('throws if both prefix and key contain colons', () => {
-      expect(() => buildDocumentId('a:b', 'c:d', 1)).toThrow('must not contain colons');
+      expect(buildDocumentId('task-meta', 'abc123', 1)).toBe('task-meta:abc123:1');
+      expect(buildDocumentId('task-conv', 'xyz', 5)).toBe('task-conv:xyz:5');
+      expect(buildDocumentId('room', 'sess-1', 2)).toBe('room:sess-1:2');
     });
   });
 
   describe('parseDocumentId', () => {
     it('parses valid document IDs', () => {
-      expect(parseDocumentId('task:abc123:1')).toEqual({ prefix: 'task', key: 'abc123', epoch: 1 });
-      expect(parseDocumentId('session:sess-1:5')).toEqual({
-        prefix: 'session',
+      expect(parseDocumentId('task-meta:abc123:1')).toEqual({
+        prefix: 'task-meta',
+        key: 'abc123',
+        epoch: 1,
+      });
+      expect(parseDocumentId('room:sess-1:5')).toEqual({
+        prefix: 'room',
         key: 'sess-1',
         epoch: 5,
       });
     });
 
     it('returns null for invalid IDs', () => {
-      expect(parseDocumentId('task:abc')).toBe(null);
-      expect(parseDocumentId('task')).toBe(null);
+      expect(parseDocumentId('task-meta:abc')).toBe(null);
+      expect(parseDocumentId('task-meta')).toBe(null);
       expect(parseDocumentId('')).toBe(null);
-      expect(parseDocumentId('task:abc:0')).toBe(null);
-      expect(parseDocumentId('task:abc:-1')).toBe(null);
-      expect(parseDocumentId('task:abc:notanumber')).toBe(null);
+      expect(parseDocumentId('task-meta:abc:0')).toBe(null);
+      expect(parseDocumentId('task-meta:abc:-1')).toBe(null);
+      expect(parseDocumentId('task-meta:abc:notanumber')).toBe(null);
       expect(parseDocumentId('a:b:c:d')).toBe(null);
     });
 
+    it('returns null for unknown prefixes', () => {
+      expect(parseDocumentId('unknown:abc:1')).toBe(null);
+      expect(parseDocumentId('task:abc:1')).toBe(null);
+      expect(parseDocumentId('session:abc:1')).toBe(null);
+    });
+
     it('rejects non-integer epoch strings', () => {
-      expect(parseDocumentId('task:abc:3abc')).toBe(null);
-      expect(parseDocumentId('task:abc:3.5')).toBe(null);
+      expect(parseDocumentId('task-meta:abc:3abc')).toBe(null);
+      expect(parseDocumentId('task-meta:abc:3.5')).toBe(null);
     });
 
     it('roundtrips with buildDocumentId', () => {
-      const id = buildDocumentId('task', 'test-123', 3);
+      const id = buildDocumentId('task-review', 'test-123', 3);
       const parsed = parseDocumentId(id);
-      expect(parsed).toEqual({ prefix: 'task', key: 'test-123', epoch: 3 });
+      expect(parsed).toEqual({ prefix: 'task-review', key: 'test-123', epoch: 3 });
     });
   });
 

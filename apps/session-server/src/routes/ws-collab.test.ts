@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { ROUTES } from '@shipyard/session';
 import { describe, expect, it } from 'vitest';
+import { generateSessionToken } from '../auth/jwt';
 import type { PresignedUrlPayload } from '../auth/types';
 import type { Env } from '../env';
 import { hmacSign } from '../utils/crypto';
@@ -47,6 +48,16 @@ async function createExpiredToken(roomId: string): Promise<string> {
   // Sign with HMAC using test secret
   const signature = await hmacSign(payloadB64, (env as unknown as Env).JWT_SECRET);
   return `${payloadB64}.${signature}`;
+}
+
+async function createUserToken(userId = 'usr_test123'): Promise<string> {
+  const testEnv = env as unknown as Env;
+  return generateSessionToken(
+    { id: userId, displayName: 'Test User' },
+    ['github'],
+    testEnv.JWT_SECRET,
+    testEnv.ENVIRONMENT
+  );
 }
 
 describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
@@ -168,9 +179,10 @@ describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
 
   it('accepts valid WebSocket upgrade request with matching token', async () => {
     const token = await createPresignedToken(testRoomId);
+    const userToken = await createUserToken();
 
     const res = await app.request(
-      `/collab/${testRoomId}?token=${token}`,
+      `/collab/${testRoomId}?token=${token}&userToken=${encodeURIComponent(userToken)}`,
       {
         method: 'GET',
         headers: {
@@ -181,20 +193,20 @@ describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
       env
     );
 
-    // When using app.request(), Durable Object forwarding will fail because
-    // we're not in a real Workers environment with DO stubs.
-    // In the real environment, this would return 101 (WebSocket upgrade).
-    // For unit testing purposes, we verify the validation passes by checking
-    // that we don't get 401/403/426 errors.
+    /**
+     * app.request() can't complete the DO WebSocket upgrade, so we verify
+     * the route-level validation passed by checking for non-auth errors.
+     */
     expect([101, 500, 503]).toContain(res.status);
   });
 
   it('handles URL-encoded token', async () => {
     const token = await createPresignedToken(testRoomId);
     const encodedToken = encodeURIComponent(token);
+    const userToken = await createUserToken();
 
     const res = await app.request(
-      `/collab/${testRoomId}?token=${encodedToken}`,
+      `/collab/${testRoomId}?token=${encodedToken}&userToken=${encodeURIComponent(userToken)}`,
       {
         method: 'GET',
         headers: {
@@ -204,7 +216,6 @@ describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
       env
     );
 
-    // Should not return 401 (token should be properly decoded)
     expect(res.status).not.toBe(401);
   });
 
@@ -258,9 +269,10 @@ describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
   it('handles special characters in roomId', async () => {
     const specialRoomId = 'room-with-dashes_and_underscores';
     const token = await createPresignedToken(specialRoomId);
+    const userToken = await createUserToken();
 
     const res = await app.request(
-      `/collab/${specialRoomId}?token=${token}`,
+      `/collab/${specialRoomId}?token=${token}&userToken=${encodeURIComponent(userToken)}`,
       {
         method: 'GET',
         headers: {
@@ -270,7 +282,6 @@ describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
       env
     );
 
-    // Should pass validation (not 401/403/426)
     expect([101, 500, 503]).toContain(res.status);
   });
 

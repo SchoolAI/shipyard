@@ -4,6 +4,9 @@ import { useUIStore } from '../stores/ui-store';
 const TASK_PATH_RE = /^\/tasks\/([^/]+)\/?$/;
 const TASK_ID_RE = /^[a-zA-Z0-9_-]+$/;
 const SETTINGS_PATH = '/settings';
+const COLLAB_PATH_RE = /^\/collab\/[^/]+\/?$/;
+
+export const COLLAB_SESSION_KEY = 'shipyard-collab-session';
 
 function isOwnedPath(pathname: string): boolean {
   return pathname === '/' || pathname === SETTINGS_PATH || TASK_PATH_RE.test(pathname);
@@ -15,9 +18,18 @@ function parseTaskIdFromPath(pathname: string): string | null {
   return id && TASK_ID_RE.test(id) ? id : null;
 }
 
+function hasActiveCollabSession(): boolean {
+  return sessionStorage.getItem(COLLAB_SESSION_KEY) !== null;
+}
+
 function pathForState(taskId: string | null, isSettings: boolean): string {
   if (isSettings) return SETTINGS_PATH;
-  return taskId ? `/tasks/${taskId}` : '/';
+  if (!taskId) {
+    sessionStorage.removeItem(COLLAB_SESSION_KEY);
+    return '/';
+  }
+  if (hasActiveCollabSession()) return window.location.pathname;
+  return `/tasks/${taskId}`;
 }
 
 export function navigateToSettings(): void {
@@ -42,7 +54,7 @@ export function initUrlSync(): () => void {
     const initialId = parseTaskIdFromPath(initialPath);
     if (initialId) {
       useTaskStore.getState().setActiveTask(initialId);
-    } else if (initialPath !== '/') {
+    } else if (initialPath !== '/' && !COLLAB_PATH_RE.test(initialPath)) {
       window.history.replaceState(null, '', '/');
     }
   }

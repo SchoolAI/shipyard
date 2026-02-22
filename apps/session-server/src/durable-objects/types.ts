@@ -23,7 +23,7 @@ export interface Participant {
   userId: string;
   username: string;
   joinedAt: number;
-  role: 'owner' | 'collaborator';
+  role: 'owner' | 'collaborator-full' | 'collaborator-review' | 'viewer';
 }
 
 /** Connection type for PersonalRoom */
@@ -45,7 +45,8 @@ export interface SerializedCollabConnectionState {
   id: string;
   userId: string;
   username: string;
-  role: 'owner' | 'collaborator';
+  role: 'owner' | 'collaborator-full' | 'collaborator-review' | 'viewer';
+  avatarUrl?: string | null;
 }
 
 /** Claims passed from route to DO via header */
@@ -62,10 +63,12 @@ export const PassedCollabPayloadSchema = z.object({
   taskId: z.string(),
   inviterId: z.string(),
   exp: z.number(),
+  role: z.enum(['collaborator-full', 'collaborator-review', 'viewer']).optional(),
   userClaims: z
     .object({
       sub: z.string(),
       displayName: z.string(),
+      avatarUrl: z.string().nullish(),
     })
     .optional(),
 });

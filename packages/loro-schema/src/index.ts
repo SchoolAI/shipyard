@@ -7,7 +7,7 @@ export {
   type InferMutableType,
   Shape,
 } from '@loro-extended/change';
-export type { EpochCloseCode } from './epoch.js';
+export type { DocumentPrefix, EpochCloseCode } from './epoch.js';
 export {
   buildDocumentId,
   buildTaskConvDocId,
@@ -31,7 +31,11 @@ export {
   toTaskId,
 } from './ids.js';
 export type { PeerRole } from './permissions.js';
-export { buildShipyardPermissions } from './permissions.js';
+export {
+  buildCollaboratorPermissions,
+  buildDualPermissions,
+  buildShipyardPermissions,
+} from './permissions.js';
 export { extractPlanMarkdown } from './plan-helpers.js';
 export {
   addTaskToIndex,

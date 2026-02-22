@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { validateToken } from '../auth/jwt';
 import type { Env } from '../env';
 import { generateId } from '../utils/crypto';
+import { getBaseUrl } from '../utils/get-base-url';
 import { createLogger } from '../utils/logger';
 import { generatePresignedUrlAsync } from '../utils/presigned-url';
 import {
@@ -35,18 +36,19 @@ collabCreateRoute.post(ROUTES.COLLAB_CREATE, async (c) => {
   const bodyResult = await parseAndValidateBody(c, CollabCreateRequestSchema);
   if (!bodyResult.ok) return bodyResult.error;
 
-  const { taskId, expiresInMinutes } = bodyResult.value;
+  const { taskId, expiresInMinutes, role } = bodyResult.value;
 
   const roomId = generateId(16);
   const expiresAt = Date.now() + (expiresInMinutes ?? 60) * 60 * 1000;
 
   const presignedUrl = await generatePresignedUrlAsync(
-    c.env.BASE_URL,
+    getBaseUrl(c.env),
     {
       roomId,
       taskId,
       inviterId: claims.sub,
       exp: expiresAt,
+      ...(role ? { role } : {}),
     },
     c.env.JWT_SECRET
   );

@@ -12,6 +12,7 @@ export interface UIStore {
   isSettingsOpen: boolean;
   isCommandPaletteOpen: boolean;
   isShortcutsModalOpen: boolean;
+  isShareModalOpen: boolean;
   selectedMachineId: string | null;
   selectedEnvironmentPath: string | null;
   theme: Theme;
@@ -66,6 +67,7 @@ export interface UIStore {
   toggleCommandPalette: () => void;
   setShortcutsModalOpen: (open: boolean) => void;
   toggleShortcutsModal: () => void;
+  setShareModalOpen: (open: boolean) => void;
   setSelectedMachineId: (id: string | null) => void;
   setSelectedEnvironmentPath: (path: string | null) => void;
   setTheme: (theme: Theme) => void;
@@ -93,6 +95,7 @@ export const useUIStore = create<UIStore>()(
         isSettingsOpen: false,
         isCommandPaletteOpen: false,
         isShortcutsModalOpen: false,
+        isShareModalOpen: false,
         selectedMachineId: null,
         selectedEnvironmentPath: null,
         theme: 'dark',
@@ -206,6 +209,9 @@ export const useUIStore = create<UIStore>()(
             undefined,
             'ui/toggleShortcutsModal'
           ),
+
+        setShareModalOpen: (open) =>
+          set({ isShareModalOpen: open }, undefined, 'ui/setShareModalOpen'),
 
         setSelectedMachineId: (id) =>
           set({ selectedMachineId: id }, undefined, 'ui/setSelectedMachineId'),

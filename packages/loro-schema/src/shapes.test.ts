@@ -30,29 +30,29 @@ describe('EpochDocumentSchema', () => {
 
 describe('document ID helpers', () => {
   it('builds epoch-versioned document IDs', () => {
-    expect(buildDocumentId('task', 'abc123', 1)).toBe('task:abc123:1');
-    expect(buildDocumentId('task', 'abc123', 2)).toBe('task:abc123:2');
-    expect(buildDocumentId('session', 'xyz', 5)).toBe('session:xyz:5');
+    expect(buildDocumentId('task-meta', 'abc123', 1)).toBe('task-meta:abc123:1');
+    expect(buildDocumentId('task-meta', 'abc123', 2)).toBe('task-meta:abc123:2');
+    expect(buildDocumentId('room', 'xyz', 5)).toBe('room:xyz:5');
   });
 
   it('parses epoch-versioned document IDs', () => {
-    const result = parseDocumentId('task:abc123:2');
-    expect(result).toEqual({ prefix: 'task', key: 'abc123', epoch: 2 });
+    const result = parseDocumentId('task-meta:abc123:2');
+    expect(result).toEqual({ prefix: 'task-meta', key: 'abc123', epoch: 2 });
   });
 
   it('returns null for invalid IDs', () => {
-    expect(parseDocumentId('task:abc123')).toBe(null);
-    expect(parseDocumentId('task')).toBe(null);
+    expect(parseDocumentId('task-meta:abc123')).toBe(null);
+    expect(parseDocumentId('task-meta')).toBe(null);
     expect(parseDocumentId('')).toBe(null);
-    expect(parseDocumentId('task:abc:0')).toBe(null);
-    expect(parseDocumentId('task:abc:-1')).toBe(null);
-    expect(parseDocumentId('task:abc:xyz')).toBe(null);
+    expect(parseDocumentId('task-meta:abc:0')).toBe(null);
+    expect(parseDocumentId('task-meta:abc:-1')).toBe(null);
+    expect(parseDocumentId('task-meta:abc:xyz')).toBe(null);
   });
 
   it('roundtrips build/parse', () => {
-    const id = buildDocumentId('task', 'my-task', 3);
+    const id = buildDocumentId('task-review', 'my-task', 3);
     const parsed = parseDocumentId(id);
-    expect(parsed).toEqual({ prefix: 'task', key: 'my-task', epoch: 3 });
+    expect(parsed).toEqual({ prefix: 'task-review', key: 'my-task', epoch: 3 });
   });
 });
 

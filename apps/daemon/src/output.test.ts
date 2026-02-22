@@ -54,6 +54,8 @@ describe('completed session output verification', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
     });
 
@@ -68,6 +70,8 @@ describe('completed session output verification', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
     });
 
@@ -87,6 +91,8 @@ describe('completed session output verification', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
     });
 
@@ -176,6 +182,8 @@ describe('completed session output verification', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
     });
 
@@ -241,6 +249,8 @@ describe('completed session output verification', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
       draft.sessions.push({
         sessionId: session1Id,
@@ -273,6 +283,8 @@ describe('completed session output verification', () => {
         reasoningEffort: null,
         permissionMode: null,
         cwd: null,
+        authorId: null,
+        authorName: null,
       });
       draft.sessions.push({
         sessionId: session2Id,

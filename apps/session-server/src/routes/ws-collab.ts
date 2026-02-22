@@ -51,11 +51,15 @@ wsCollabRoute.get(ROUTES.WS_COLLAB, async (c) => {
     return expiredResponse(c, 'Collaboration link has expired');
   }
 
-  let userClaims: { sub: string; displayName: string } | undefined;
+  let userClaims: { sub: string; displayName: string; avatarUrl?: string | null } | undefined;
   if (userToken) {
     const claims = await validateToken(userToken, c.env.JWT_SECRET, c.env.ENVIRONMENT);
     if (claims) {
-      userClaims = { sub: claims.sub, displayName: claims.displayName };
+      userClaims = {
+        sub: claims.sub,
+        displayName: claims.displayName,
+        avatarUrl: claims.avatarUrl ?? null,
+      };
     }
   }
 

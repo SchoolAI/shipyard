@@ -20,6 +20,8 @@ export interface ShipyardJWTClaims {
   displayName: string;
   /** Linked OAuth providers */
   providers: string[];
+  /** User avatar URL (e.g. GitHub profile picture) */
+  avatarUrl?: string | null;
   iat: number;
   exp: number;
   scope?: string;
@@ -50,4 +52,5 @@ export interface PresignedUrlPayload {
   taskId: string;
   inviterId: string;
   exp: number;
+  role?: 'collaborator-full' | 'collaborator-review' | 'viewer';
 }

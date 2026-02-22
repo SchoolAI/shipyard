@@ -11,14 +11,9 @@ import {
 } from '../db/device-flow';
 import { findOrCreateUser, findUserById } from '../db/index';
 import type { Env } from '../env';
+import { getBaseUrl } from '../utils/get-base-url';
 import { createLogger } from '../utils/logger';
 import { errorResponse, parseAndValidateBody } from '../utils/route-helpers';
-
-function getBaseUrl(env: Env): string {
-  return env.ENVIRONMENT === 'production'
-    ? 'https://shipyard-session-server.jacob-191.workers.dev'
-    : 'http://localhost:4444';
-}
 
 function escapeHtml(str: string): string {
   return str
