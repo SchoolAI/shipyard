@@ -10,6 +10,7 @@ import type { Handle, HandleWithEphemerals } from '@loro-extended/repo';
 import { Repo } from '@loro-extended/repo';
 import {
   buildDocumentId,
+  buildShipyardPermissions,
   buildTaskConvDocId,
   buildTaskMetaDocId,
   buildTaskReviewDocId,
@@ -259,8 +260,9 @@ export async function serve(env: Env): Promise<void> {
   const storage = new FileStorageAdapter(dataDir);
   const webrtcAdapter = new WebRtcDataChannelAdapter();
   const repo = new Repo({
-    identity: { name: 'shipyard-daemon' },
+    identity: { name: 'shipyard-daemon', type: 'service' },
     adapters: [storage, webrtcAdapter],
+    permissions: buildShipyardPermissions('owner'),
   });
 
   const terminalPtys = new Map<string, PtyManager>();

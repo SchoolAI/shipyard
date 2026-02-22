@@ -66,9 +66,7 @@ export function buildShipyardPermissions(localRole: PeerRole): ShipyardPermissio
       }
     },
 
-    creation: (_docId: string, _peer: PeerContext): boolean => {
-      return _peer.channelKind === 'storage';
-    },
+    creation: (_docId: string, _peer: PeerContext): boolean => true,
 
     deletion: (_doc: DocContext, _peer: PeerContext) => false,
   };
