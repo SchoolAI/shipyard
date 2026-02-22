@@ -13,7 +13,7 @@ catalog:
   "@loro-extended/react": "^5.4.2"
   "@loro-extended/adapter-webrtc": "^5.4.2"
   "@loro-extended/adapter-indexeddb": "^5.4.2"
-  loro-crdt: "^1.10.3"
+  loro-crdt: "~1.10.3"
 
   # ===== Build tools =====
   typescript: "^5.9.3"
@@ -24,12 +24,7 @@ catalog:
   "@vitest/coverage-v8": "^4.0.17"
   "@vitest/coverage-istanbul": "^3.0.4"
 
-  # ===== AI / Agent =====
-  "@anthropic-ai/claude-agent-sdk": "^0.2.39"
-
   # ===== Runtime dependencies =====
-  pino: "^9.6.0"
-  pino-pretty: "^13.0.0"
   zod: "^4.3.5"
   hono: "^4.11.3"
   nanoid: "^5.1.6"
