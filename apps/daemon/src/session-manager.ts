@@ -224,6 +224,35 @@ function resolveModel(model: string | undefined): {
 
 export type StatusChangeCallback = (status: A2ATaskState) => void;
 
+const ZERO_WIDTH_SPACE = '\u200B';
+
+/**
+ * If the prompt starts with `/`, check whether the command matches a known skill.
+ * Unknown slash-prefixed messages get a zero-width space prepended so Claude Code
+ * treats them as regular text instead of silently dropping them as unrecognized
+ * slash commands.
+ */
+function escapeUnknownSlashCommand(
+  prompt: string | ContentBlock[],
+  knownSkills: ReadonlySet<string>
+): string | ContentBlock[] {
+  if (typeof prompt === 'string') {
+    if (!prompt.startsWith('/')) return prompt;
+    const commandName = prompt.slice(1).split(/\s/)[0] ?? '';
+    if (knownSkills.has(commandName)) return prompt;
+    return ZERO_WIDTH_SPACE + prompt;
+  }
+
+  const firstText = prompt.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
+  if (!firstText || !firstText.text.startsWith('/')) return prompt;
+  const commandName = firstText.text.slice(1).split(/\s/)[0] ?? '';
+  if (knownSkills.has(commandName)) return prompt;
+
+  return prompt.map((block) =>
+    block === firstText ? { ...block, text: ZERO_WIDTH_SPACE + block.text } : block
+  );
+}
+
 export class SessionManager {
   readonly #metaDoc: TypedDoc<TaskMetaDocumentShape>;
   readonly #convDoc: TypedDoc<TaskConversationDocumentShape>;
@@ -233,6 +262,7 @@ export class SessionManager {
   #machineId: string | null = null;
   #inputController: StreamingInputController | null = null;
   #activeQuery: Query | null = null;
+  #knownSkills: Set<string> = new Set();
 
   constructor(taskDocs: TaskDocHandles, onStatusChange?: StatusChangeCallback) {
     this.#metaDoc = taskDocs.meta;
@@ -349,7 +379,6 @@ export class SessionManager {
     this.#notifyStatusChange('starting');
 
     const controller = new StreamingInputController();
-    controller.push(typeof opts.prompt === 'string' ? opts.prompt : toSdkContent(opts.prompt));
 
     const response: Query = query({
       prompt: controller.iterable(),
@@ -362,7 +391,7 @@ export class SessionManager {
         maxTurns: opts.maxTurns,
         abortController: opts.abortController,
         allowDangerouslySkipPermissions: opts.allowDangerouslySkipPermissions,
-        settingSources: opts.settingSources ?? ['project'],
+        settingSources: opts.settingSources ?? ['user', 'project'],
         systemPrompt: opts.systemPrompt ?? {
           type: 'preset',
           preset: 'claude_code',
@@ -377,6 +406,11 @@ export class SessionManager {
     this.#inputController = controller;
     this.#activeQuery = response;
 
+    this.#knownSkills = await this.#fetchKnownSkills(response);
+
+    const escaped = escapeUnknownSlashCommand(opts.prompt, this.#knownSkills);
+    controller.push(typeof escaped === 'string' ? escaped : toSdkContent(escaped));
+
     return this.#processMessages(response, sessionId, opts.abortController);
   }
 
@@ -389,7 +423,8 @@ export class SessionManager {
     if (!this.#inputController || this.#inputController.isDone) {
       throw new Error('No active streaming session to send follow-up to');
     }
-    this.#inputController.push(typeof prompt === 'string' ? prompt : toSdkContent(prompt));
+    const escaped = escapeUnknownSlashCommand(prompt, this.#knownSkills);
+    this.#inputController.push(typeof escaped === 'string' ? escaped : toSdkContent(escaped));
 
     change(this.#metaDoc, (draft) => {
       draft.meta.status = 'working';
@@ -407,6 +442,22 @@ export class SessionManager {
     this.#activeQuery?.close();
     this.#inputController = null;
     this.#activeQuery = null;
+  }
+
+  async #fetchKnownSkills(response: Query): Promise<Set<string>> {
+    const TIMEOUT_MS = 5_000;
+    try {
+      const commands = await Promise.race([
+        response.supportedCommands(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('supportedCommands timed out')), TIMEOUT_MS)
+        ),
+      ]);
+      return new Set(commands.map((c) => c.name));
+    } catch {
+      logger.warn('Failed to fetch supportedCommands, all slash-prefixed messages will be escaped');
+      return new Set();
+    }
   }
 
   /**
@@ -487,7 +538,6 @@ export class SessionManager {
     this.#notifyStatusChange('starting');
 
     const controller = new StreamingInputController();
-    controller.push(typeof prompt === 'string' ? prompt : toSdkContent(prompt));
 
     const response: Query = query({
       prompt: controller.iterable(),
@@ -503,7 +553,7 @@ export class SessionManager {
         allowDangerouslySkipPermissions: opts?.allowDangerouslySkipPermissions,
         canUseTool: opts?.canUseTool,
         stderr: opts?.stderr,
-        settingSources: ['project'],
+        settingSources: ['user', 'project'],
         systemPrompt: {
           type: 'preset',
           preset: 'claude_code',
@@ -515,6 +565,11 @@ export class SessionManager {
 
     this.#inputController = controller;
     this.#activeQuery = response;
+
+    this.#knownSkills = await this.#fetchKnownSkills(response);
+
+    const escaped = escapeUnknownSlashCommand(prompt, this.#knownSkills);
+    controller.push(typeof escaped === 'string' ? escaped : toSdkContent(escaped));
 
     return this.#processMessages(response, newSessionId, opts?.abortController);
   }
