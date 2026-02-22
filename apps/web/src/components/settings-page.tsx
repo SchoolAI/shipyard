@@ -239,12 +239,14 @@ export function SettingsPage({
           <div className="flex items-center justify-between rounded-lg border border-separator bg-surface/50 px-3 py-2.5">
             <div className="flex items-center gap-2 min-w-0">
               <Moon className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden="true" />
-              <span className="text-sm text-foreground">Prevent idle sleep</span>
+              <span id="keep-awake-label" className="text-sm text-foreground">
+                Prevent idle sleep
+              </span>
             </div>
             <Switch
               isSelected={keepMachineAwake ?? false}
               onChange={handleToggleKeepAwake}
-              aria-label="Keep machine awake during tasks"
+              aria-labelledby="keep-awake-label"
               size="sm"
             >
               <Switch.Control>
