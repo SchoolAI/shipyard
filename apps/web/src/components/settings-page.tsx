@@ -246,7 +246,11 @@ export function SettingsPage({
               onChange={handleToggleKeepAwake}
               aria-label="Keep machine awake during tasks"
               size="sm"
-            />
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </div>
         </section>
 
