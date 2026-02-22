@@ -30,6 +30,8 @@ export {
   toSessionId,
   toTaskId,
 } from './ids.js';
+export type { PeerRole } from './permissions.js';
+export { buildShipyardPermissions } from './permissions.js';
 export { extractPlanMarkdown } from './plan-helpers.js';
 export {
   addTaskToIndex,

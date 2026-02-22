@@ -3,6 +3,7 @@ import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import { RepoContext, useRepo } from '@loro-extended/react';
 import type { AnyAdapter, RepoParams } from '@loro-extended/repo';
 import { Repo } from '@loro-extended/repo';
+import { buildShipyardPermissions } from '@shipyard/loro-schema';
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 
 const WebRtcAdapterContext = createContext<WebRtcDataChannelAdapter | null>(null);
@@ -57,8 +58,9 @@ export function ShipyardRepoProvider({
         adapters.unshift(new IndexedDBStorageAdapter());
       }
       repoParams = {
-        identity: { name: 'browser' },
+        identity: { name: 'browser', type: 'user' },
         adapters,
+        permissions: buildShipyardPermissions('owner'),
       };
     }
 
