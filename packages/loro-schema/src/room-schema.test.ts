@@ -395,6 +395,39 @@ describe('UserSettings composer preferences', () => {
   });
 });
 
+describe('UserSettings keepMachineAwake', () => {
+  let doc: ReturnType<typeof createTypedDoc<typeof TaskIndexDocumentSchema>>;
+
+  beforeEach(() => {
+    doc = createTypedDoc(TaskIndexDocumentSchema, { doc: new LoroDoc() });
+  });
+
+  it('defaults to false when not set', () => {
+    const json = doc.toJSON();
+    expect(json.userSettings.keepMachineAwake).toBe(false);
+  });
+
+  it('stores and reads true', () => {
+    change(doc, (draft) => {
+      draft.userSettings.keepMachineAwake = true;
+    });
+
+    expect(doc.toJSON().userSettings.keepMachineAwake).toBe(true);
+  });
+
+  it('stores and reads false after toggle', () => {
+    change(doc, (draft) => {
+      draft.userSettings.keepMachineAwake = true;
+    });
+
+    change(doc, (draft) => {
+      draft.userSettings.keepMachineAwake = false;
+    });
+
+    expect(doc.toJSON().userSettings.keepMachineAwake).toBe(false);
+  });
+});
+
 describe('concurrent CRDT merge', () => {
   const now = Date.now();
 

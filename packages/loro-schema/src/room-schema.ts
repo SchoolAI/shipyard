@@ -59,6 +59,7 @@ export const UserSettingsShape = Shape.struct({
   composerModel: Shape.plain.string().nullable(),
   composerReasoning: Shape.plain.string(...REASONING_EFFORTS).nullable(),
   composerPermission: Shape.plain.string(...PERMISSION_MODES).nullable(),
+  keepMachineAwake: Shape.plain.boolean(),
 });
 
 /**
