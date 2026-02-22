@@ -2,7 +2,7 @@ name: Publish npm
 
 on:
   schedule:
-    - cron: '15 2 * * *' # 2:15 AM UTC daily
+    - cron: '15 6 * * *' # 6:15 AM UTC (midnight MST)
   workflow_dispatch:
     inputs:
       release_type:
@@ -153,16 +153,21 @@ jobs:
             exit 1
           fi
 
-          COUNTER=$(node -e "
-            const versions = JSON.parse(process.argv[1]);
+          COUNTER=$(npm view @schoolai/shipyard versions --json 2>/dev/null | node -e "
             const prefix = process.env.PREFIX;
-            const arr = Array.isArray(versions) ? versions : (typeof versions === 'string' ? [versions] : []);
-            const counters = arr
-              .filter(v => typeof v === 'string' && v.startsWith(prefix))
-              .map(v => Number(v.slice(prefix.length)))
-              .filter(n => Number.isFinite(n) && n >= 0);
-            console.log(counters.length === 0 ? 0 : Math.max(...counters) + 1);
-          " "$(npm view @schoolai/shipyard versions --json 2>/dev/null || echo '[]')")
+            let data = '';
+            process.stdin.setEncoding('utf8');
+            process.stdin.on('data', c => data += c);
+            process.stdin.on('end', () => {
+              const versions = JSON.parse(data || '[]');
+              const arr = Array.isArray(versions) ? versions : (typeof versions === 'string' ? [versions] : []);
+              const counters = arr
+                .filter(v => typeof v === 'string' && v.startsWith(prefix))
+                .map(v => Number(v.slice(prefix.length)))
+                .filter(n => Number.isFinite(n) && n >= 0);
+              console.log(counters.length === 0 ? 0 : Math.max(...counters) + 1);
+            });
+          ")
 
           VERSION="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}.${COUNTER}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"

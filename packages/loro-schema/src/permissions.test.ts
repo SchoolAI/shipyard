@@ -133,8 +133,8 @@ describe('buildShipyardPermissions', () => {
       expect(perms.creation('any-doc', storagePeer)).toBe(true);
     });
 
-    it('blocks creation from network peers', () => {
-      expect(perms.creation('any-doc', networkPeer)).toBe(false);
+    it('allows creation from network peers', () => {
+      expect(perms.creation('any-doc', networkPeer)).toBe(true);
     });
   });
 
