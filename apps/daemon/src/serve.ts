@@ -53,6 +53,7 @@ import {
   getUnstagedDiff,
 } from './capabilities.js';
 import { recoverOrphanedTask } from './crash-recovery.js';
+import { shouldDispatchNewWork } from './dispatch-gate.js';
 import type { Env } from './env.js';
 import { getShipyardHome } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
@@ -745,6 +746,8 @@ export async function serve(env: Env): Promise<void> {
     log.info({ state }, 'Connection state changed');
   });
 
+  const dispatchingTasks = new Set<string>();
+
   connection.onMessage((msg) => {
     handleMessage(msg, {
       log,
@@ -755,6 +758,7 @@ export async function serve(env: Env): Promise<void> {
       roomHandle: typedRoomHandle,
       lifecycle,
       activeTasks,
+      dispatchingTasks,
       watchedTasks,
       taskHandles,
       lastProcessedConvLen,
@@ -785,6 +789,7 @@ export async function serve(env: Env): Promise<void> {
       task.abortController.abort();
     }
     activeTasks.clear();
+    dispatchingTasks.clear();
     for (const timer of diffDebounceTimers.values()) {
       clearTimeout(timer);
     }
@@ -829,6 +834,8 @@ interface MessageHandlerContext {
   roomHandle: HandleWithEphemerals<TaskIndexDocumentShape, typeof ROOM_EPHEMERAL_DECLARATIONS>;
   lifecycle: LifecycleManager;
   activeTasks: Map<string, ActiveTask>;
+  /** Guards against re-entrant dispatch when change() triggers synchronous Loro subscriptions */
+  dispatchingTasks: Set<string>;
   watchedTasks: Map<string, () => void>;
   taskHandles: Map<string, TaskHandleGroup>;
   lastProcessedConvLen: Map<string, number>;
@@ -1911,6 +1918,31 @@ function promotePendingFollowUps(
 }
 
 /**
+ * Move orphaned pending follow-ups into the main conversation list.
+ * Returns the number of promoted messages.
+ */
+function promoteOrphanedFollowUps(
+  taskHandle: TaskHandleGroup,
+  convJson: ReturnType<TaskHandleGroup['conv']['doc']['toJSON']>,
+  taskLog: ReturnType<typeof createChildLogger>
+): number {
+  const pendingFollowUps = convJson.pendingFollowUps ?? [];
+  if (pendingFollowUps.length === 0) return 0;
+
+  taskLog.info({ pendingCount: pendingFollowUps.length }, 'Promoting orphaned pending follow-ups');
+  change(taskHandle.conv.doc, (draft) => {
+    const items = draft.pendingFollowUps.toArray();
+    for (const msg of items) {
+      draft.conversation.push(msg);
+    }
+    if (draft.pendingFollowUps.length > 0) {
+      draft.pendingFollowUps.delete(0, draft.pendingFollowUps.length);
+    }
+  });
+  return pendingFollowUps.length;
+}
+
+/**
  * Called when a task document changes (from a remote import).
  * Checks if there is new work to do and dispatches accordingly.
  */
@@ -1947,53 +1979,56 @@ function onTaskDocChanged(
     return;
   }
 
-  const pendingFollowUps = convJson.pendingFollowUps ?? [];
-  if (pendingFollowUps.length > 0) {
-    taskLog.info(
-      { pendingCount: pendingFollowUps.length },
-      'Promoting orphaned pending follow-ups'
-    );
-    change(taskHandle.conv.doc, (draft) => {
-      const items = draft.pendingFollowUps.toArray();
-      for (const msg of items) {
-        draft.conversation.push(msg);
-      }
-      if (draft.pendingFollowUps.length > 0) {
-        draft.pendingFollowUps.delete(0, draft.pendingFollowUps.length);
-      }
-    });
+  if (ctx.dispatchingTasks.has(taskId)) {
+    taskLog.debug('Already dispatching, skipping re-entrant call');
+    return;
   }
+
+  ctx.dispatchingTasks.add(taskId);
+
+  const promotedCount = promoteOrphanedFollowUps(taskHandle, convJson, taskLog);
 
   const freshConvJson = taskHandle.conv.doc.toJSON();
   const conversation = freshConvJson.conversation;
-  if (conversation.length === 0) {
-    taskLog.debug('No conversation messages, skipping');
-    return;
-  }
-
-  const lastMessage = conversation[conversation.length - 1];
-  if (!lastMessage || lastMessage.role !== 'user') {
-    return;
-  }
-
   const prevLen = ctx.lastProcessedConvLen.get(taskId) ?? 0;
-  if (conversation.length <= prevLen) {
-    taskLog.debug(
-      { conversationLen: conversation.length, lastProcessed: prevLen },
-      'No new messages since last run, skipping'
-    );
+
+  const gateResult = shouldDispatchNewWork({
+    conversation,
+    lastProcessedConvLen: prevLen,
+    isActive: false,
+  });
+
+  if (!gateResult.dispatch) {
+    ctx.dispatchingTasks.delete(taskId);
+    if (promotedCount > 0) {
+      taskLog.warn(
+        { taskId, pendingCount: promotedCount, reason: gateResult.reason },
+        'Promoted pending follow-ups but dispatch blocked'
+      );
+    } else {
+      taskLog.debug(
+        {
+          reason: gateResult.reason,
+          conversationLen: conversation.length,
+          lastProcessed: prevLen,
+          lastRole: conversation[conversation.length - 1]?.role,
+        },
+        'onTaskDocChanged skipped dispatch'
+      );
+    }
     return;
   }
 
+  const lastUserMessage = gateResult.lastUserMessage;
   taskLog.info(
-    { prevLen, newLen: conversation.length },
+    { prevLen, newLen: conversation.length, messageId: lastUserMessage.messageId },
     'New user message detected, starting agent'
   );
 
-  const cwd = lastMessage.cwd ?? process.cwd();
-  const model = lastMessage.model ?? undefined;
-  const permissionMode = mapPermissionMode(lastMessage.permissionMode);
-  const effort = lastMessage.reasoningEffort ?? undefined;
+  const cwd = lastUserMessage.cwd ?? process.cwd();
+  const model = lastUserMessage.model ?? undefined;
+  const permissionMode = mapPermissionMode(lastUserMessage.permissionMode);
+  const effort = lastUserMessage.reasoningEffort ?? undefined;
 
   const abortController = ctx.lifecycle.createAbortController();
 
@@ -2045,6 +2080,7 @@ function onTaskDocChanged(
           status: result.status,
           totalCostUsd: result.totalCostUsd,
           durationMs: result.durationMs,
+          error: result.error,
         },
         'Task complete'
       );
@@ -2062,9 +2098,13 @@ function onTaskDocChanged(
         turnStartRefPromise,
         abortController,
         ctx,
-      }).catch((cleanupErr: unknown) => {
-        taskLog.warn({ err: cleanupErr }, 'cleanupTaskRun failed');
       })
+        .catch((cleanupErr: unknown) => {
+          taskLog.warn({ err: cleanupErr }, 'cleanupTaskRun failed');
+        })
+        .finally(() => {
+          ctx.dispatchingTasks.delete(taskId);
+        })
     );
 }
 
@@ -2602,16 +2642,23 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
   const resumeInfo = manager.shouldResume();
   if (resumeInfo.resume && resumeInfo.sessionId) {
     log.info({ sessionId: resumeInfo.sessionId }, 'Resuming existing session');
-    return manager.resumeSession(resumeInfo.sessionId, contentBlocks, {
-      abortController,
-      machineId,
-      model,
-      permissionMode,
-      effort,
-      canUseTool,
-      stderr,
-      allowDangerouslySkipPermissions: true,
-    });
+    try {
+      return await manager.resumeSession(resumeInfo.sessionId, contentBlocks, {
+        abortController,
+        machineId,
+        model,
+        permissionMode,
+        effort,
+        canUseTool,
+        stderr,
+        allowDangerouslySkipPermissions: true,
+      });
+    } catch (err) {
+      log.warn(
+        { err, sessionId: resumeInfo.sessionId },
+        'Resume failed, falling back to new session'
+      );
+    }
   }
 
   return manager.createSession({

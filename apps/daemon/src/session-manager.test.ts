@@ -10,7 +10,7 @@ import {
 import { isContainer } from 'loro-crdt';
 import { nanoid } from 'nanoid';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SessionManager } from './session-manager.js';
+import { IDLE_TIMEOUT_MS, SessionManager } from './session-manager.js';
 
 function createTaskDocHandles(): TaskDocHandles {
   return {
@@ -1196,7 +1196,7 @@ describe('SessionManager', () => {
   });
 
   describe('idle timeout', () => {
-    it('aborts session after IDLE_TIMEOUT_MS of no messages', async () => {
+    it('marks session as interrupted (not failed) after IDLE_TIMEOUT_MS of no messages', async () => {
       vi.useFakeTimers();
       try {
         const ctrl = mockQueryControllable();
@@ -1208,16 +1208,102 @@ describe('SessionManager', () => {
         await vi.advanceTimersByTimeAsync(100);
 
         // Advance past the 5-minute idle timeout
-        await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1000);
+        await vi.advanceTimersByTimeAsync(IDLE_TIMEOUT_MS + 1000);
 
         ctrl.end();
         const result = await sessionPromise;
 
-        expect(result.status).toBe('failed');
+        expect(result.status).toBe('interrupted');
         expect(result.error).toMatch(/idle timeout/i);
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('sets meta.status to canceled when idle timeout occurs', async () => {
+      vi.useFakeTimers();
+      try {
+        const ctrl = mockQueryControllable();
+        mockQuery.mockReturnValue(ctrl.query);
+
+        const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+        ctrl.emit(initMsg('sess-idle-meta'));
+        await vi.advanceTimersByTimeAsync(100);
+
+        await vi.advanceTimersByTimeAsync(IDLE_TIMEOUT_MS + 1000);
+
+        ctrl.end();
+        await sessionPromise;
+
+        expect(taskDocs.meta.toJSON().meta.status).toBe('canceled');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('sets session entry status to interrupted on idle timeout', async () => {
+      vi.useFakeTimers();
+      try {
+        const ctrl = mockQueryControllable();
+        mockQuery.mockReturnValue(ctrl.query);
+
+        const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+        ctrl.emit(initMsg('sess-idle-entry'));
+        await vi.advanceTimersByTimeAsync(100);
+
+        await vi.advanceTimersByTimeAsync(IDLE_TIMEOUT_MS + 1000);
+
+        ctrl.end();
+        const result = await sessionPromise;
+
+        const json = taskDocs.conv.toJSON();
+        const session = json.sessions.find((s) => s.sessionId === result.sessionId);
+        expect(session?.status).toBe('interrupted');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('shouldResume returns resume: true for an idle-timed-out session', async () => {
+      vi.useFakeTimers();
+      try {
+        const ctrl = mockQueryControllable();
+        mockQuery.mockReturnValue(ctrl.query);
+
+        const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+        ctrl.emit(initMsg('sess-idle-resume'));
+        await vi.advanceTimersByTimeAsync(100);
+
+        await vi.advanceTimersByTimeAsync(IDLE_TIMEOUT_MS + 1000);
+
+        ctrl.end();
+        await sessionPromise;
+
+        const resumeResult = manager.shouldResume();
+        expect(resumeResult.resume).toBe(true);
+        expect(resumeResult.sessionId).toBeDefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('marks session as failed when not idle timeout and not aborted', async () => {
+      mockQuery.mockReturnValue(
+        mockQueryThrows([initMsg('sess-throw-fail')], new Error('Process exited unexpectedly'))
+      );
+
+      const result = await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      expect(result.status).toBe('failed');
+      expect(result.error).toBe('Process exited unexpectedly');
+      expect(taskDocs.meta.toJSON().meta.status).toBe('failed');
+
+      const json = taskDocs.conv.toJSON();
+      const session = json.sessions.find((s) => s.sessionId === result.sessionId);
+      expect(session?.status).toBe('failed');
     });
 
     it('resets timer when messages arrive', async () => {
