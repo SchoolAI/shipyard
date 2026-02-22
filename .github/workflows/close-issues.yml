@@ -1,0 +1,107 @@
+name: Close Linked Issues
+
+# Graphite merge queue lands commits directly on main and closes the original
+# PRs as "closed" (not "merged"), so GitHub's automatic issue-closing keywords
+# never fire. This workflow parses commit messages and associated PR bodies for
+# close/fix/resolve keywords whenever commits land on main and closes the issues.
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  close-issues:
+    runs-on: ubuntu-latest
+    name: Close Linked Issues
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Close linked GitHub issues
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        env:
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { execSync } = require('child_process');
+            const before = process.env.BEFORE;
+            const sha = process.env.SHA;
+            const nullSha = '0000000000000000000000000000000000000000';
+            const hexSha = /^[0-9a-f]{40}$/i;
+
+            if (before === nullSha) {
+              core.info('First push to branch — skipping issue close');
+              return;
+            }
+
+            if (!hexSha.test(before) || !hexSha.test(sha)) {
+              core.setFailed(`Unexpected SHA format: before=${before} sha=${sha}`);
+              return;
+            }
+
+            let log, commits;
+            try {
+              log = execSync(`git log ${before}..${sha} --format=%B`).toString();
+              commits = execSync(`git log ${before}..${sha} --format=%H`)
+                .toString().trim().split('\n').filter(Boolean);
+            } catch (e) {
+              // Force-push can leave `before` unreachable in history
+              core.warning(`Could not read commit range ${before}..${sha}: ${e.message}`);
+              return;
+            }
+
+            const closePattern = /(?:closes?|fixes?|resolves?)\s+#(\d+)/gi;
+            const issueNumbers = new Set();
+
+            let match;
+            while ((match = closePattern.exec(log)) !== null) {
+              issueNumbers.add(parseInt(match[1], 10));
+            }
+
+            for (const commitSha of commits) {
+              try {
+                const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  commit_sha: commitSha,
+                });
+                for (const pr of prs) {
+                  if (pr.body) {
+                    closePattern.lastIndex = 0;
+                    while ((match = closePattern.exec(pr.body)) !== null) {
+                      issueNumbers.add(parseInt(match[1], 10));
+                    }
+                  }
+                }
+              } catch (e) {
+                core.warning(`Could not fetch PRs for ${commitSha}: ${e.message}`);
+              }
+            }
+
+            if (issueNumbers.size === 0) {
+              core.info('No linked issues found');
+              return;
+            }
+
+            for (const n of issueNumbers) {
+              try {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: n,
+                  state: 'closed',
+                  state_reason: 'completed',
+                });
+                core.info(`Closed #${n}`);
+              } catch (e) {
+                core.warning(`Could not close #${n}: ${e.message}`);
+              }
+            }
