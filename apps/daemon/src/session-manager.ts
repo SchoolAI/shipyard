@@ -17,7 +17,10 @@ import type {
   ContentBlock,
   SessionState,
   SupportedImageMediaType,
-  TaskDocumentShape,
+  TaskConversationDocumentShape,
+  TaskDocHandles,
+  TaskMetaDocumentShape,
+  TaskReviewDocumentShape,
 } from '@shipyard/loro-schema';
 import { extractPlanMarkdown, SUPPORTED_IMAGE_MEDIA_TYPES } from '@shipyard/loro-schema';
 import { nanoid } from 'nanoid';
@@ -222,15 +225,19 @@ function resolveModel(model: string | undefined): {
 export type StatusChangeCallback = (status: A2ATaskState) => void;
 
 export class SessionManager {
-  readonly #taskDoc: TypedDoc<TaskDocumentShape>;
+  readonly #metaDoc: TypedDoc<TaskMetaDocumentShape>;
+  readonly #convDoc: TypedDoc<TaskConversationDocumentShape>;
+  readonly #reviewDoc: TypedDoc<TaskReviewDocumentShape>;
   readonly #onStatusChange: StatusChangeCallback | undefined;
   #currentModel: string | null = null;
   #machineId: string | null = null;
   #inputController: StreamingInputController | null = null;
   #activeQuery: Query | null = null;
 
-  constructor(taskDoc: TypedDoc<TaskDocumentShape>, onStatusChange?: StatusChangeCallback) {
-    this.#taskDoc = taskDoc;
+  constructor(taskDocs: TaskDocHandles, onStatusChange?: StatusChangeCallback) {
+    this.#metaDoc = taskDocs.meta;
+    this.#convDoc = taskDocs.conv;
+    this.#reviewDoc = taskDocs.review;
     this.#onStatusChange = onStatusChange;
   }
 
@@ -250,7 +257,7 @@ export class SessionManager {
    * Returns null if no user message exists.
    */
   getLatestUserPrompt(): string | null {
-    const conversation = this.#taskDoc.toJSON().conversation;
+    const conversation = this.#convDoc.toJSON().conversation;
     for (let i = conversation.length - 1; i >= 0; i--) {
       const msg = conversation[i];
       if (msg?.role === 'user') {
@@ -270,7 +277,7 @@ export class SessionManager {
    * relevant when constructing a new prompt.
    */
   getLatestUserContentBlocks(): ContentBlock[] | null {
-    const conversation = this.#taskDoc.toJSON().conversation;
+    const conversation = this.#convDoc.toJSON().conversation;
     for (let i = conversation.length - 1; i >= 0; i--) {
       const msg = conversation[i];
       if (msg?.role === 'user') {
@@ -292,7 +299,7 @@ export class SessionManager {
    * { resume: true, sessionId } so the caller can pass it to resumeSession().
    */
   shouldResume(): { resume: boolean; sessionId?: string } {
-    const sessions = this.#taskDoc.toJSON().sessions;
+    const sessions = this.#convDoc.toJSON().sessions;
     if (sessions.length === 0) return { resume: false };
 
     for (let i = sessions.length - 1; i >= 0; i--) {
@@ -320,7 +327,7 @@ export class SessionManager {
     const sessionId = nanoid();
     const now = Date.now();
 
-    change(this.#taskDoc, (draft) => {
+    change(this.#convDoc, (draft) => {
       draft.sessions.push({
         sessionId,
         agentSessionId: '',
@@ -334,6 +341,8 @@ export class SessionManager {
         durationMs: null,
         error: null,
       });
+    });
+    change(this.#metaDoc, (draft) => {
       draft.meta.status = 'starting';
       draft.meta.updatedAt = now;
     });
@@ -382,7 +391,7 @@ export class SessionManager {
     }
     this.#inputController.push(typeof prompt === 'string' ? prompt : toSdkContent(prompt));
 
-    change(this.#taskDoc, (draft) => {
+    change(this.#metaDoc, (draft) => {
       draft.meta.status = 'working';
       draft.meta.updatedAt = Date.now();
     });
@@ -440,7 +449,7 @@ export class SessionManager {
       stderr?: (data: string) => void;
     }
   ): Promise<SessionResult> {
-    const sessions = this.#taskDoc.toJSON().sessions;
+    const sessions = this.#convDoc.toJSON().sessions;
     const sessionEntry = sessions.find((s) => s.sessionId === sessionId);
     if (!sessionEntry) {
       throw new Error(`Session ${sessionId} not found in task doc`);
@@ -456,7 +465,7 @@ export class SessionManager {
     const newSessionId = nanoid();
     const now = Date.now();
 
-    change(this.#taskDoc, (draft) => {
+    change(this.#convDoc, (draft) => {
       draft.sessions.push({
         sessionId: newSessionId,
         agentSessionId: sessionEntry.agentSessionId,
@@ -470,6 +479,8 @@ export class SessionManager {
         durationMs: null,
         error: null,
       });
+    });
+    change(this.#metaDoc, (draft) => {
       draft.meta.status = 'starting';
       draft.meta.updatedAt = now;
     });
@@ -573,7 +584,7 @@ export class SessionManager {
    * concurrent CRDT syncs that may shift list positions.
    */
   #findSessionIndex(sessionId: string): number {
-    const sessions = this.#taskDoc.toJSON().sessions;
+    const sessions = this.#convDoc.toJSON().sessions;
     return sessions.findIndex((s) => s.sessionId === sessionId);
   }
 
@@ -620,12 +631,14 @@ export class SessionManager {
         this.#updateModelFromInit(message.model);
       }
       const idx = this.#findSessionIndex(sessionId);
-      change(this.#taskDoc, (draft) => {
+      change(this.#convDoc, (draft) => {
         const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
         if (session) {
           session.agentSessionId = initSessionId;
           session.status = 'active';
         }
+      });
+      change(this.#metaDoc, (draft) => {
         draft.meta.status = 'working';
         draft.meta.updatedAt = Date.now();
       });
@@ -685,20 +698,19 @@ export class SessionManager {
 
     if (toolResultBlocks.length === 0) return;
 
-    const conversation = this.#taskDoc.toJSON().conversation;
+    const conversation = this.#convDoc.toJSON().conversation;
     const lastMsg = conversation[conversation.length - 1];
 
     if (lastMsg && lastMsg.role === 'assistant') {
       const lastIdx = conversation.length - 1;
-      change(this.#taskDoc, (draft) => {
+      change(this.#convDoc, (draft) => {
         for (const block of toolResultBlocks) {
           draft.conversation.get(lastIdx)?.content.push(block);
         }
-        draft.meta.updatedAt = Date.now();
       });
     } else {
       /** NOTE: No preceding assistant message -- store as a standalone assistant entry */
-      change(this.#taskDoc, (draft) => {
+      change(this.#convDoc, (draft) => {
         draft.conversation.push({
           messageId: nanoid(),
           role: 'assistant',
@@ -710,9 +722,11 @@ export class SessionManager {
           permissionMode: null,
           cwd: null,
         });
-        draft.meta.updatedAt = Date.now();
       });
     }
+    change(this.#metaDoc, (draft) => {
+      draft.meta.updatedAt = Date.now();
+    });
   }
 
   #appendAssistantMessage(message: SDKMessage & { type: 'assistant' }): void {
@@ -732,7 +746,7 @@ export class SessionManager {
 
     if (contentBlocks.length === 0) return;
 
-    change(this.#taskDoc, (draft) => {
+    change(this.#convDoc, (draft) => {
       draft.conversation.push({
         messageId: nanoid(),
         role: 'assistant',
@@ -744,6 +758,8 @@ export class SessionManager {
         permissionMode: null,
         cwd: null,
       });
+    });
+    change(this.#metaDoc, (draft) => {
       draft.meta.updatedAt = Date.now();
     });
 
@@ -767,7 +783,7 @@ export class SessionManager {
         continue;
       }
 
-      const existingPlans = this.#taskDoc.toJSON().plans;
+      const existingPlans = this.#reviewDoc.toJSON().plans;
       if (existingPlans.some((p) => p.toolUseId === block.toolUseId)) {
         logger.debug(
           { toolUseId: block.toolUseId },
@@ -778,7 +794,7 @@ export class SessionManager {
 
       const planId = nanoid();
 
-      change(this.#taskDoc, (draft) => {
+      change(this.#reviewDoc, (draft) => {
         draft.plans.push({
           planId,
           toolUseId: block.toolUseId,
@@ -789,7 +805,7 @@ export class SessionManager {
         });
       });
 
-      const loroDoc = getLoroDoc(this.#taskDoc);
+      const loroDoc = getLoroDoc(this.#reviewDoc);
       const initOk = initPlanEditorDoc(loroDoc, planId, planMarkdown);
       if (!initOk) {
         logger.warn(
@@ -823,7 +839,7 @@ export class SessionManager {
 
     const idx = this.#findSessionIndex(sessionId);
     const taskStatus: A2ATaskState = isSuccess ? 'completed' : 'failed';
-    change(this.#taskDoc, (draft) => {
+    change(this.#convDoc, (draft) => {
       const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
       if (session) {
         session.status = isSuccess ? 'completed' : 'failed';
@@ -834,6 +850,8 @@ export class SessionManager {
           session.error = errorText ?? `Agent SDK error: ${message.subtype}`;
         }
       }
+    });
+    change(this.#metaDoc, (draft) => {
       draft.meta.status = taskStatus;
       draft.meta.updatedAt = completedAt;
     });
@@ -876,12 +894,14 @@ export class SessionManager {
 
   #markInterrupted(sessionId: string): void {
     const idx = this.#findSessionIndex(sessionId);
-    change(this.#taskDoc, (draft) => {
+    change(this.#convDoc, (draft) => {
       const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
       if (session) {
         session.status = 'interrupted';
         session.completedAt = Date.now();
       }
+    });
+    change(this.#metaDoc, (draft) => {
       draft.meta.status = 'canceled';
       draft.meta.updatedAt = Date.now();
     });
@@ -890,13 +910,15 @@ export class SessionManager {
 
   #markFailed(sessionId: string, errorMsg: string): void {
     const idx = this.#findSessionIndex(sessionId);
-    change(this.#taskDoc, (draft) => {
+    change(this.#convDoc, (draft) => {
       const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
       if (session) {
         session.status = 'failed';
         session.completedAt = Date.now();
         session.error = errorMsg;
       }
+    });
+    change(this.#metaDoc, (draft) => {
       draft.meta.status = 'failed';
       draft.meta.updatedAt = Date.now();
     });

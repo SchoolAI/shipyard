@@ -6,10 +6,13 @@ import type { CanUseTool, PermissionMode, PermissionResult } from '@anthropic-ai
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import { change, type TypedDoc } from '@loro-extended/change';
-import type { HandleWithEphemerals } from '@loro-extended/repo';
+import type { Handle, HandleWithEphemerals } from '@loro-extended/repo';
 import { Repo } from '@loro-extended/repo';
 import {
   buildDocumentId,
+  buildTaskConvDocId,
+  buildTaskMetaDocId,
+  buildTaskReviewDocId,
   classifyToolRisk,
   DEFAULT_EPOCH,
   LOCAL_USER_ID,
@@ -19,10 +22,15 @@ import {
   PermissionResponseEphemeral,
   type PlanComment,
   ROOM_EPHEMERAL_DECLARATIONS,
-  TaskDocumentSchema,
-  type TaskDocumentShape,
+  TaskConversationDocumentSchema,
+  type TaskConversationDocumentShape,
+  type TaskDocHandles,
   TaskIndexDocumentSchema,
   type TaskIndexDocumentShape,
+  TaskMetaDocumentSchema,
+  type TaskMetaDocumentShape,
+  TaskReviewDocumentSchema,
+  type TaskReviewDocumentShape,
   TERMINAL_TASK_STATES,
   updateTaskInIndex,
 } from '@shipyard/loro-schema';
@@ -115,8 +123,16 @@ const TaskEphemeralDeclarations = {
   permResps: PermissionResponseEphemeral,
 };
 
-type TaskEphemeralDecls = typeof TaskEphemeralDeclarations;
-type TaskHandle = HandleWithEphemerals<TaskDocumentShape, TaskEphemeralDecls>;
+type TaskConvHandle = HandleWithEphemerals<
+  TaskConversationDocumentShape,
+  typeof TaskEphemeralDeclarations
+>;
+
+interface TaskHandleGroup {
+  meta: Handle<TaskMetaDocumentShape>;
+  conv: TaskConvHandle;
+  review: Handle<TaskReviewDocumentShape>;
+}
 
 interface ActiveTask {
   taskId: string;
@@ -156,17 +172,32 @@ async function rehydrateTaskDocuments(
     if (TERMINAL_STATUSES.has(entry.status)) continue;
 
     try {
-      const taskDocId = buildDocumentId('task', taskId, DEFAULT_EPOCH);
-      const taskHandle = repo.get(taskDocId, TaskDocumentSchema, TaskEphemeralDeclarations);
-      await taskHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
+      const epoch = DEFAULT_EPOCH;
+      const metaHandle = repo.get(buildTaskMetaDocId(taskId, epoch), TaskMetaDocumentSchema);
+      const convHandle = repo.get(
+        buildTaskConvDocId(taskId, epoch),
+        TaskConversationDocumentSchema,
+        TaskEphemeralDeclarations
+      );
+      const reviewHandle = repo.get(buildTaskReviewDocId(taskId, epoch), TaskReviewDocumentSchema);
 
-      if (recoverOrphanedTask(taskHandle.doc, createChildLogger({ mode: 'rehydrate', taskId }))) {
+      await Promise.all([
+        metaHandle.waitForSync({ kind: 'storage', timeout: 5_000 }),
+        convHandle.waitForSync({ kind: 'storage', timeout: 5_000 }),
+      ]);
+
+      const taskDocs: TaskDocHandles = {
+        meta: metaHandle.doc,
+        conv: convHandle.doc,
+        review: reviewHandle.doc,
+      };
+      if (recoverOrphanedTask(taskDocs, createChildLogger({ mode: 'rehydrate', taskId }))) {
         updateTaskInIndex(roomDoc, taskId, { status: 'failed', updatedAt: Date.now() });
       }
 
-      log.debug({ taskId, taskDocId }, 'Task document rehydrated');
+      log.debug({ taskId }, 'Task documents rehydrated');
     } catch (err) {
-      log.warn({ taskId, err }, 'Failed to rehydrate task document');
+      log.warn({ taskId, err }, 'Failed to rehydrate task documents');
     }
   }
 
@@ -216,7 +247,7 @@ export async function serve(env: Env): Promise<void> {
   const { signaling, connection, capabilities } = handle;
   const activeTasks = new Map<string, ActiveTask>();
   const watchedTasks = new Map<string, () => void>();
-  const taskHandles = new Map<string, TaskHandle>();
+  const taskHandles = new Map<string, TaskHandleGroup>();
   const lastProcessedConvLen = new Map<string, number>();
 
   const devSuffix = env.SHIPYARD_DEV ? '-dev' : '';
@@ -780,7 +811,7 @@ interface MessageHandlerContext {
   lifecycle: LifecycleManager;
   activeTasks: Map<string, ActiveTask>;
   watchedTasks: Map<string, () => void>;
-  taskHandles: Map<string, TaskHandle>;
+  taskHandles: Map<string, TaskHandleGroup>;
   lastProcessedConvLen: Map<string, number>;
   peerManager: PeerManager;
   env: Env;
@@ -798,7 +829,7 @@ const branchDiffTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function debouncedDiffCapture(
   taskId: string,
   cwd: string,
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   log: ReturnType<typeof createChildLogger>
 ): void {
   const existing = diffDebounceTimers.get(taskId);
@@ -817,7 +848,7 @@ function debouncedDiffCapture(
 
 async function captureDiffState(
   cwd: string,
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   log: ReturnType<typeof createChildLogger>
 ): Promise<void> {
   const [unstaged, staged, files] = await Promise.all([
@@ -825,7 +856,7 @@ async function captureDiffState(
     getStagedDiff(cwd),
     getChangedFiles(cwd),
   ]);
-  change(taskHandle.doc, (draft) => {
+  change(taskHandle.conv.doc, (draft) => {
     draft.diffState.unstaged = unstaged;
     draft.diffState.staged = staged;
     const fileList = draft.diffState.files;
@@ -843,7 +874,7 @@ async function captureDiffState(
 function debouncedBranchDiffCapture(
   taskId: string,
   cwd: string,
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   log: ReturnType<typeof createChildLogger>
 ): void {
   const existing = branchDiffTimers.get(taskId);
@@ -862,7 +893,7 @@ function debouncedBranchDiffCapture(
 
 async function captureBranchDiffState(
   cwd: string,
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   log: ReturnType<typeof createChildLogger>
 ): Promise<void> {
   const baseBranch = await getDefaultBranch(cwd);
@@ -876,7 +907,7 @@ async function captureBranchDiffState(
     getBranchFiles(cwd, baseBranch),
   ]);
 
-  change(taskHandle.doc, (draft) => {
+  change(taskHandle.conv.doc, (draft) => {
     draft.diffState.branchDiff = branchDiff;
     draft.diffState.branchBase = baseBranch;
     const fileList = draft.diffState.branchFiles;
@@ -894,7 +925,7 @@ async function captureBranchDiffState(
 async function captureTurnDiff(
   cwd: string,
   turnStartRef: string | null,
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   log: ReturnType<typeof createChildLogger>
 ): Promise<void> {
   const turnEndRef = await captureTreeSnapshot(cwd);
@@ -922,7 +953,7 @@ async function captureTurnDiff(
     return;
   }
 
-  change(taskHandle.doc, (draft) => {
+  change(taskHandle.conv.doc, (draft) => {
     draft.diffState.lastTurnDiff = turnDiff;
     const fileList = draft.diffState.lastTurnFiles;
     if (fileList.length > 0) {
@@ -1708,59 +1739,81 @@ async function watchTaskDocument(
   ctx: MessageHandlerContext
 ): Promise<void> {
   const epoch = DEFAULT_EPOCH;
-  const taskDocId = buildDocumentId('task', taskId, epoch);
-  taskLog.info({ taskDocId, epoch }, 'Watching task document');
+  const metaDocId = buildTaskMetaDocId(taskId, epoch);
+  const convDocId = buildTaskConvDocId(taskId, epoch);
+  const reviewDocId = buildTaskReviewDocId(taskId, epoch);
+  taskLog.info({ metaDocId, convDocId, reviewDocId, epoch }, 'Watching task documents');
 
-  const taskHandle = ctx.repo.get(taskDocId, TaskDocumentSchema, TaskEphemeralDeclarations);
+  const metaHandle = ctx.repo.get(metaDocId, TaskMetaDocumentSchema);
+  const convHandle = ctx.repo.get(
+    convDocId,
+    TaskConversationDocumentSchema,
+    TaskEphemeralDeclarations
+  );
+  const reviewHandle = ctx.repo.get(reviewDocId, TaskReviewDocumentSchema);
+  const taskHandle: TaskHandleGroup = { meta: metaHandle, conv: convHandle, review: reviewHandle };
 
   try {
-    await taskHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
+    await Promise.all([
+      metaHandle.waitForSync({ kind: 'storage', timeout: 5_000 }),
+      convHandle.waitForSync({ kind: 'storage', timeout: 5_000 }),
+    ]);
   } catch {
-    taskLog.info({ taskDocId }, 'No existing task data in storage');
+    taskLog.info({ convDocId, metaDocId }, 'No existing task data in storage');
   }
 
   try {
-    await taskHandle.waitForSync({ kind: 'network', timeout: 3_000 });
+    await convHandle.waitForSync({ kind: 'network', timeout: 3_000 });
   } catch {
     taskLog.warn(
-      { taskDocId, timeoutMs: 3_000 },
+      { convDocId, timeoutMs: 3_000 },
       'Network sync timed out (browser may not be connected yet)'
     );
   }
 
-  if (recoverOrphanedTask(taskHandle.doc, taskLog)) {
+  const taskDocs: TaskDocHandles = {
+    meta: metaHandle.doc,
+    conv: convHandle.doc,
+    review: reviewHandle.doc,
+  };
+  if (recoverOrphanedTask(taskDocs, taskLog)) {
     updateTaskInIndex(ctx.roomDoc, taskId, { status: 'failed', updatedAt: Date.now() });
   }
 
-  const json = taskHandle.doc.toJSON();
-  const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
+  const convJson = convHandle.doc.toJSON();
+  const lastUserMsg = [...convJson.conversation].reverse().find((m) => m.role === 'user');
   const initialCwd = lastUserMsg?.cwd ?? process.cwd();
   captureBranchDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
     taskLog.warn({ err }, 'Failed to capture initial branch diff');
   });
 
-  const opCountBefore = taskHandle.loroDoc.opCount();
-  taskLog.info({ taskDocId, opCount: opCountBefore }, 'Doc state before subscribe');
+  const opCountBefore = convHandle.loroDoc.opCount();
+  taskLog.info({ convDocId, opCount: opCountBefore }, 'Doc state before subscribe');
 
-  const unsubscribe = taskHandle.subscribe((event) => {
-    taskLog.info({ taskDocId, eventBy: event.by }, 'Subscription event received');
+  const unsubscribe = convHandle.subscribe((event) => {
+    taskLog.info({ convDocId, eventBy: event.by }, 'Subscription event received');
     onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
   });
 
   ctx.watchedTasks.set(taskId, unsubscribe);
   ctx.taskHandles.set(taskId, taskHandle);
-  taskLog.info({ taskDocId }, 'Subscribed to task document changes');
+  taskLog.info({ convDocId }, 'Subscribed to task document changes');
 
   /**
    * Also check immediately in case the doc already has a pending user message
    * (daemon restart scenario where the browser already wrote the message).
    */
-  const opCountAfter = taskHandle.loroDoc.opCount();
-  taskLog.info({ taskDocId, opCount: opCountAfter }, 'Doc state after subscribe');
+  const opCountAfter = convHandle.loroDoc.opCount();
+  taskLog.info({ convDocId, opCount: opCountAfter }, 'Doc state after subscribe');
   if (opCountAfter > 0) {
-    const json = taskHandle.doc.toJSON();
+    const metaJson = metaHandle.doc.toJSON();
+    const freshConvJson = convHandle.doc.toJSON();
     taskLog.info(
-      { taskDocId, status: json.meta.status, conversationLen: json.conversation.length },
+      {
+        convDocId,
+        status: metaJson.meta.status,
+        conversationLen: freshConvJson.conversation.length,
+      },
       'Checking existing doc data'
     );
     onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
@@ -1768,7 +1821,7 @@ async function watchTaskDocument(
 }
 
 function promotePendingFollowUps(
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   activeTask: ActiveTask | undefined,
   taskLog: ReturnType<typeof createChildLogger>
 ): void {
@@ -1777,7 +1830,7 @@ function promotePendingFollowUps(
     taskLog.debug('Task is being aborted, skipping pending follow-up promotion');
     return;
   }
-  const json = taskHandle.doc.toJSON();
+  const json = taskHandle.conv.doc.toJSON();
   const pending = json.pendingFollowUps ?? [];
   if (pending.length === 0) return;
 
@@ -1787,7 +1840,7 @@ function promotePendingFollowUps(
    * false) before activeTasks.delete runs. Remote CRDT imports during that async gap
    * would otherwise leave messages permanently stuck in pendingFollowUps.
    */
-  change(taskHandle.doc, (draft) => {
+  change(taskHandle.conv.doc, (draft) => {
     const items = draft.pendingFollowUps.toArray();
     for (const msg of items) {
       draft.conversation.push(msg);
@@ -1842,30 +1895,30 @@ function promotePendingFollowUps(
  */
 function onTaskDocChanged(
   taskId: string,
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   taskLog: ReturnType<typeof createChildLogger>,
   ctx: MessageHandlerContext
 ): void {
-  const doc = taskHandle.doc;
-  const json = doc.toJSON();
+  const metaJson = taskHandle.meta.doc.toJSON();
+  const convJson = taskHandle.conv.doc.toJSON();
 
   taskLog.info(
     {
-      status: json.meta.status,
-      conversationLen: json.conversation.length,
-      lastRole: json.conversation[json.conversation.length - 1]?.role,
+      status: metaJson.meta.status,
+      conversationLen: convJson.conversation.length,
+      lastRole: convJson.conversation[convJson.conversation.length - 1]?.role,
       isActive: ctx.activeTasks.has(taskId),
     },
     'onTaskDocChanged evaluation'
   );
 
   if (ctx.activeTasks.has(taskId)) {
-    const pendingFollowUps = json.pendingFollowUps ?? [];
+    const pendingFollowUps = convJson.pendingFollowUps ?? [];
     if (pendingFollowUps.length > 0) {
       promotePendingFollowUps(taskHandle, ctx.activeTasks.get(taskId), taskLog);
     }
 
-    const conversation = json.conversation;
+    const conversation = convJson.conversation;
     const activeLastUserMsg = [...conversation].reverse().find((m) => m.role === 'user');
     const activeCwd = activeLastUserMsg?.cwd ?? process.cwd();
     debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
@@ -1873,13 +1926,13 @@ function onTaskDocChanged(
     return;
   }
 
-  const pendingFollowUps = json.pendingFollowUps ?? [];
+  const pendingFollowUps = convJson.pendingFollowUps ?? [];
   if (pendingFollowUps.length > 0) {
     taskLog.info(
       { pendingCount: pendingFollowUps.length },
       'Promoting orphaned pending follow-ups'
     );
-    change(taskHandle.doc, (draft) => {
+    change(taskHandle.conv.doc, (draft) => {
       const items = draft.pendingFollowUps.toArray();
       for (const msg of items) {
         draft.conversation.push(msg);
@@ -1890,8 +1943,8 @@ function onTaskDocChanged(
     });
   }
 
-  const freshJson = taskHandle.doc.toJSON();
-  const conversation = freshJson.conversation;
+  const freshConvJson = taskHandle.conv.doc.toJSON();
+  const conversation = freshConvJson.conversation;
   if (conversation.length === 0) {
     taskLog.debug('No conversation messages, skipping');
     return;
@@ -1926,7 +1979,12 @@ function onTaskDocChanged(
   const onStatusChange: StatusChangeCallback = (status) => {
     updateTaskInIndex(ctx.roomDoc, taskId, { status, updatedAt: Date.now() });
   };
-  const manager = new SessionManager(doc, onStatusChange);
+  const taskDocs: TaskDocHandles = {
+    meta: taskHandle.meta.doc,
+    conv: taskHandle.conv.doc,
+    review: taskHandle.review.doc,
+  };
+  const manager = new SessionManager(taskDocs, onStatusChange);
 
   const activeTask: ActiveTask = {
     taskId,
@@ -1991,7 +2049,7 @@ function onTaskDocChanged(
 interface CleanupTaskRunOptions {
   taskId: string;
   cwd: string;
-  taskHandle: TaskHandle;
+  taskHandle: TaskHandleGroup;
   taskLog: ReturnType<typeof createChildLogger>;
   turnStartRefPromise: Promise<string | null>;
   abortController: AbortController;
@@ -2027,11 +2085,11 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
     taskLog.warn({ err }, 'Failed to capture turn diff');
   }
 
-  for (const [key] of taskHandle.permReqs.getAll()) {
-    taskHandle.permReqs.delete(key);
+  for (const [key] of taskHandle.conv.permReqs.getAll()) {
+    taskHandle.conv.permReqs.delete(key);
   }
-  for (const [key] of taskHandle.permResps.getAll()) {
-    taskHandle.permResps.delete(key);
+  for (const [key] of taskHandle.conv.permResps.getAll()) {
+    taskHandle.conv.permResps.delete(key);
   }
 
   ctx.activeTasks.delete(taskId);
@@ -2114,7 +2172,7 @@ function toPermissionResult(
 }
 
 interface PermissionResponseContext {
-  taskHandle: TaskHandle;
+  taskHandle: TaskHandleGroup;
   roomDoc: TypedDoc<TaskIndexDocumentShape>;
   taskId: string;
   taskLog: ReturnType<typeof createChildLogger>;
@@ -2132,12 +2190,12 @@ interface PermissionResponseContext {
  * flows through to the SDK permission result.
  */
 function resolveExitPlanMode(
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   taskLog: ReturnType<typeof createChildLogger>,
   toolUseID: string,
   value: { decision: string; persist: boolean; message: string | null }
 ): void {
-  const plans = taskHandle.doc.toJSON().plans;
+  const plans = taskHandle.review.doc.toJSON().plans;
   const planIndex = plans.findIndex((p) => p.toolUseId === toolUseID);
   if (planIndex < 0) return;
 
@@ -2145,9 +2203,9 @@ function resolveExitPlanMode(
   if (!plan) return;
 
   const reviewStatus = value.decision === 'approved' ? 'approved' : 'changes-requested';
-  const editedMarkdown = serializePlanEditorDoc(taskHandle.loroDoc, plan.planId);
+  const editedMarkdown = serializePlanEditorDoc(taskHandle.review.loroDoc, plan.planId);
 
-  const allComments = taskHandle.doc.toJSON().planComments;
+  const allComments = taskHandle.review.doc.toJSON().planComments;
   const planComments = Object.values(allComments).filter(
     (c) => c.planId === plan.planId && c.resolvedAt === null
   );
@@ -2159,7 +2217,7 @@ function resolveExitPlanMode(
     value.message ?? null
   );
 
-  change(taskHandle.doc, (draft) => {
+  change(taskHandle.review.doc, (draft) => {
     const draftPlan = draft.plans.get(planIndex);
     if (draftPlan) {
       draftPlan.reviewStatus = reviewStatus;
@@ -2225,10 +2283,10 @@ function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionRe
   const { taskHandle, roomDoc, taskId, taskLog, toolName, toolUseID, input, suggestions, value } =
     ctx;
 
-  taskHandle.permReqs.delete(toolUseID);
-  taskHandle.permResps.delete(toolUseID);
+  taskHandle.conv.permReqs.delete(toolUseID);
+  taskHandle.conv.permResps.delete(toolUseID);
 
-  change(taskHandle.doc, (draft) => {
+  change(taskHandle.meta.doc, (draft) => {
     draft.meta.status = 'working';
     draft.meta.updatedAt = Date.now();
   });
@@ -2261,7 +2319,7 @@ function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionRe
 }
 
 function buildCanUseTool(
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   taskLog: ReturnType<typeof createChildLogger>,
   roomDoc: TypedDoc<TaskIndexDocumentShape>,
   taskId: string
@@ -2275,7 +2333,7 @@ function buildCanUseTool(
 
     const riskLevel = classifyToolRisk(toolName, input);
 
-    taskHandle.permReqs.set(toolUseID, {
+    taskHandle.conv.permReqs.set(toolUseID, {
       toolName,
       toolInput: JSON.stringify(input),
       riskLevel,
@@ -2286,7 +2344,7 @@ function buildCanUseTool(
       createdAt: Date.now(),
     });
 
-    change(taskHandle.doc, (draft) => {
+    change(taskHandle.meta.doc, (draft) => {
       draft.meta.status = 'input-required';
       draft.meta.updatedAt = Date.now();
     });
@@ -2315,8 +2373,8 @@ function buildCanUseTool(
         clearTimeout(timeout);
         unsub?.();
         signal.removeEventListener('abort', onAbort);
-        taskHandle.permReqs.delete(toolUseID);
-        change(taskHandle.doc, (draft) => {
+        taskHandle.conv.permReqs.delete(toolUseID);
+        change(taskHandle.meta.doc, (draft) => {
           draft.meta.status = 'working';
           draft.meta.updatedAt = Date.now();
         });
@@ -2335,7 +2393,7 @@ function buildCanUseTool(
 
       signal.addEventListener('abort', onAbort, { once: true });
 
-      unsub = taskHandle.permResps.subscribe(({ key, value, source }) => {
+      unsub = taskHandle.conv.permResps.subscribe(({ key, value, source }) => {
         if (source === 'local') return;
         if (key !== toolUseID || !value) return;
 
@@ -2364,7 +2422,7 @@ function buildCanUseTool(
 function collectPlanFeedback(
   unresolvedPlan: PlanComment[],
   plans: Array<{ planId: string; markdown: string }>,
-  loroDoc: TaskHandle['loroDoc']
+  loroDoc: import('loro-crdt').LoroDoc
 ): string[] {
   const parts: string[] = [];
   const byPlanId = new Map<string, typeof unresolvedPlan>();
@@ -2402,17 +2460,17 @@ function collectPlanFeedback(
  * prevent re-delivery on subsequent turns.
  */
 function harvestUndeliveredComments(
-  taskHandle: TaskHandle,
+  taskHandle: TaskHandleGroup,
   contentBlocks: Array<{ type: string; text?: string }>,
   log: ReturnType<typeof createChildLogger>
 ): void {
-  const json = taskHandle.doc.toJSON();
-  const deliveredSet = new Set(json.deliveredCommentIds ?? []);
+  const reviewJson = taskHandle.review.doc.toJSON();
+  const deliveredSet = new Set(reviewJson.deliveredCommentIds ?? []);
 
-  const unresolvedDiff = Object.values(json.diffComments).filter(
+  const unresolvedDiff = Object.values(reviewJson.diffComments).filter(
     (c) => c.resolvedAt === null && !deliveredSet.has(c.commentId)
   );
-  const unresolvedPlan = Object.values(json.planComments).filter(
+  const unresolvedPlan = Object.values(reviewJson.planComments).filter(
     (c) => c.resolvedAt === null && !deliveredSet.has(c.commentId)
   );
 
@@ -2430,7 +2488,9 @@ function harvestUndeliveredComments(
   }
 
   if (unresolvedPlan.length > 0) {
-    feedbackParts.push(...collectPlanFeedback(unresolvedPlan, json.plans, taskHandle.loroDoc));
+    feedbackParts.push(
+      ...collectPlanFeedback(unresolvedPlan, reviewJson.plans, taskHandle.review.loroDoc)
+    );
   }
 
   if (feedbackParts.length === 0) {
@@ -2445,7 +2505,7 @@ function harvestUndeliveredComments(
     ...unresolvedPlan.map((c) => c.commentId),
   ];
 
-  change(taskHandle.doc, (draft) => {
+  change(taskHandle.review.doc, (draft) => {
     for (const id of harvestedIds) {
       draft.deliveredCommentIds.push(id);
     }
@@ -2459,7 +2519,7 @@ function harvestUndeliveredComments(
 
 interface RunTaskOptions {
   sessionManager: SessionManager;
-  taskHandle: TaskHandle;
+  taskHandle: TaskHandleGroup;
   taskId: string;
   roomDoc: TypedDoc<TaskIndexDocumentShape>;
   cwd: string;

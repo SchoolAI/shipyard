@@ -2,6 +2,9 @@ import { change, type TypedDoc } from '@loro-extended/change';
 import { useDoc } from '@loro-extended/react';
 import {
   buildDocumentId,
+  buildTaskConvDocId,
+  buildTaskMetaDocId,
+  buildTaskReviewDocId,
   DEFAULT_EPOCH,
   type DiffComment,
   type DiffCommentScope,
@@ -15,19 +18,23 @@ import {
   type PlanComment,
   type PlanVersion,
   type SessionEntry,
-  TaskDocumentSchema,
-  type TaskDocumentShape,
+  TaskConversationDocumentSchema,
   type TaskMeta,
+  TaskMetaDocumentSchema,
+  TaskReviewDocumentSchema,
+  type TaskReviewDocumentShape,
 } from '@shipyard/loro-schema';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRepo } from '../providers/repo-provider';
 
 /**
- * Sentinel doc ID used when no task is selected.
- * This ensures hooks are called unconditionally (rules of hooks).
- * The handle for this ID is never displayed.
+ * Sentinel doc IDs used when no task is selected.
+ * These ensure hooks are called unconditionally (rules of hooks).
+ * The handles for these IDs are never displayed.
  */
-const SENTINEL_DOC_ID = buildDocumentId('task', '__sentinel__', DEFAULT_EPOCH);
+const SENTINEL_META_DOC_ID = buildDocumentId('task-meta', '__sentinel__', DEFAULT_EPOCH);
+const SENTINEL_CONV_DOC_ID = buildDocumentId('task-conv', '__sentinel__', DEFAULT_EPOCH);
+const SENTINEL_REVIEW_DOC_ID = buildDocumentId('task-review', '__sentinel__', DEFAULT_EPOCH);
 
 const EPHEMERAL_DECLARATIONS = {
   permReqs: PermissionRequestEphemeral,
@@ -92,33 +99,55 @@ const EMPTY_PERMISSIONS = new Map<string, PermissionRequest>();
  * from null -> real ID, the handle stays stale (sentinel doc).
  *
  * Fix: call repo.get() directly via useMemo so it reacts to docId changes.
+ *
+ * Internally manages 3 separate document handles (meta, conversation, review)
+ * but exposes the same TaskDocumentResult interface so downstream components
+ * don't need to change.
  */
 export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const repo = useRepo();
 
-  const docId = useMemo(
-    () => (taskId ? buildDocumentId('task', taskId, DEFAULT_EPOCH) : SENTINEL_DOC_ID),
+  const metaDocId = useMemo(
+    () => (taskId ? buildTaskMetaDocId(taskId, DEFAULT_EPOCH) : SENTINEL_META_DOC_ID),
+    [taskId]
+  );
+  const convDocId = useMemo(
+    () => (taskId ? buildTaskConvDocId(taskId, DEFAULT_EPOCH) : SENTINEL_CONV_DOC_ID),
+    [taskId]
+  );
+  const reviewDocId = useMemo(
+    () => (taskId ? buildTaskReviewDocId(taskId, DEFAULT_EPOCH) : SENTINEL_REVIEW_DOC_ID),
     [taskId]
   );
 
   // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-  const handle = useMemo(
-    () => repo.get(docId, TaskDocumentSchema as never, EPHEMERAL_DECLARATIONS),
-    [repo, docId]
+  const metaHandle = useMemo(
+    () => repo.get(metaDocId, TaskMetaDocumentSchema as never),
+    [repo, metaDocId]
+  );
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+  const convHandle = useMemo(
+    () => repo.get(convDocId, TaskConversationDocumentSchema as never, EPHEMERAL_DECLARATIONS),
+    [repo, convDocId]
+  );
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+  const reviewHandle = useMemo(
+    () => repo.get(reviewDocId, TaskReviewDocumentSchema as never),
+    [repo, reviewDocId]
   );
 
-  const meta = useDoc(handle, (d: { meta: TaskMeta }) => d.meta);
-  const conversation = useDoc(handle, (d: { conversation: Message[] }) => d.conversation);
+  const meta = useDoc(metaHandle, (d: { meta: TaskMeta }) => d.meta);
+  const conversation = useDoc(convHandle, (d: { conversation: Message[] }) => d.conversation);
   const pendingFollowUps = useDoc(
-    handle,
+    convHandle,
     (d: { pendingFollowUps: Message[] }) => d.pendingFollowUps
   );
-  const sessions = useDoc(handle, (d: { sessions: SessionEntry[] }) => d.sessions);
-  const plans = useDoc(handle, (d: { plans: PlanVersion[] }) => d.plans);
-  const diffState = useDoc(handle, (d: { diffState: DiffState }) => d.diffState);
+  const sessions = useDoc(convHandle, (d: { sessions: SessionEntry[] }) => d.sessions);
+  const plans = useDoc(reviewHandle, (d: { plans: PlanVersion[] }) => d.plans);
+  const diffState = useDoc(convHandle, (d: { diffState: DiffState }) => d.diffState);
 
   const diffCommentsRecord = useDoc(
-    handle,
+    reviewHandle,
     (d: { diffComments: Record<string, DiffComment> }) => d.diffComments
   );
 
@@ -128,7 +157,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   );
 
   const planCommentsRecord = useDoc(
-    handle,
+    reviewHandle,
     (d: { planComments: Record<string, PlanComment> }) => d.planComments
   );
 
@@ -138,7 +167,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   );
 
   const rawDeliveredIds: string[] | undefined = useDoc(
-    handle,
+    reviewHandle,
     (d: { deliveredCommentIds: string[] }) => d.deliveredCommentIds
   );
   const deliveredCommentIds: string[] = rawDeliveredIds ?? [];
@@ -146,13 +175,14 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const markCommentsDelivered = useCallback(
     (commentIds: string[]) => {
       if (commentIds.length === 0) return;
-      const loroList = handle.loroDoc.getList('deliveredCommentIds');
-      for (const id of commentIds) {
-        loroList.push(id);
-      }
-      handle.loroDoc.commit();
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+      change(reviewHandle.doc as unknown as TypedDoc<TaskReviewDocumentShape>, (draft) => {
+        for (const id of commentIds) {
+          draft.deliveredCommentIds.push(id);
+        }
+      });
     },
-    [handle]
+    [reviewHandle]
   );
 
   const lastUserConfig = useMemo((): LastUserConfig | null => {
@@ -189,7 +219,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       return;
     }
 
-    const permReqs = handle.permReqs;
+    const permReqs = convHandle.permReqs;
 
     const initialState = permReqs.getAll();
     setPendingPermissions(initialState.size > 0 ? new Map(initialState) : EMPTY_PERMISSIONS);
@@ -207,7 +237,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     });
 
     return unsub;
-  }, [handle, taskId]);
+  }, [convHandle, taskId]);
 
   const respondToPermission = useCallback(
     (
@@ -215,7 +245,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       decision: PermissionDecision,
       opts?: { persist?: boolean; message?: string }
     ) => {
-      handle.permResps.set(toolUseId, {
+      convHandle.permResps.set(toolUseId, {
         decision,
         persist: opts?.persist ?? false,
         message: opts?.message ?? null,
@@ -228,7 +258,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
         return next;
       });
     },
-    [handle]
+    [convHandle]
   );
 
   const addDiffComment = useCallback(
@@ -243,7 +273,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     }): string => {
       const commentId = crypto.randomUUID();
       // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+      change(reviewHandle.doc as unknown as TypedDoc<TaskReviewDocumentShape>, (draft) => {
         draft.diffComments.set(commentId, {
           commentId,
           ...comment,
@@ -254,13 +284,13 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       });
       return commentId;
     },
-    [handle]
+    [reviewHandle]
   );
 
   const resolveDiffComment = useCallback(
     (commentId: string) => {
       // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+      change(reviewHandle.doc as unknown as TypedDoc<TaskReviewDocumentShape>, (draft) => {
         const existing = draft.diffComments.get(commentId);
         if (existing) {
           draft.diffComments.set(commentId, {
@@ -270,17 +300,17 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
         }
       });
     },
-    [handle]
+    [reviewHandle]
   );
 
   const deleteDiffComment = useCallback(
     (commentId: string) => {
       // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+      change(reviewHandle.doc as unknown as TypedDoc<TaskReviewDocumentShape>, (draft) => {
         draft.diffComments.delete(commentId);
       });
     },
-    [handle]
+    [reviewHandle]
   );
 
   const addPlanComment = useCallback(
@@ -295,7 +325,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       const commentId = comment.commentId ?? crypto.randomUUID();
       const { commentId: _discarded, ...commentFields } = comment;
       // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+      change(reviewHandle.doc as unknown as TypedDoc<TaskReviewDocumentShape>, (draft) => {
         draft.planComments.set(commentId, {
           commentId,
           ...commentFields,
@@ -306,13 +336,13 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       });
       return commentId;
     },
-    [handle]
+    [reviewHandle]
   );
 
   const resolvePlanComment = useCallback(
     (commentId: string) => {
       // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+      change(reviewHandle.doc as unknown as TypedDoc<TaskReviewDocumentShape>, (draft) => {
         const existing = draft.planComments.get(commentId);
         if (existing) {
           draft.planComments.set(commentId, {
@@ -322,17 +352,17 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
         }
       });
     },
-    [handle]
+    [reviewHandle]
   );
 
   const deletePlanComment = useCallback(
     (commentId: string) => {
       // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
-      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+      change(reviewHandle.doc as unknown as TypedDoc<TaskReviewDocumentShape>, (draft) => {
         draft.planComments.delete(commentId);
       });
     },
-    [handle]
+    [reviewHandle]
   );
 
   if (!taskId) {
