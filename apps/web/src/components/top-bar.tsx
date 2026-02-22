@@ -4,18 +4,26 @@ import { PanelRight, Terminal } from 'lucide-react';
 import { HOTKEYS } from '../constants/hotkeys';
 import { useTaskIndex } from '../hooks/use-task-index';
 import { useTaskStore } from '../stores';
+import { formatCostUsd } from '../utils/format-cost';
 import { MobileSidebarToggle } from './sidebar';
 
 interface TopBarProps {
   onToggleTerminal: () => void;
   onToggleSidePanel: () => void;
   hasUnviewedDiff?: boolean;
+  totalCostUsd?: number | null;
 }
 
-export function TopBar({ onToggleTerminal, onToggleSidePanel, hasUnviewedDiff }: TopBarProps) {
+export function TopBar({
+  onToggleTerminal,
+  onToggleSidePanel,
+  hasUnviewedDiff,
+  totalCostUsd,
+}: TopBarProps) {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const activeEntry = activeTaskId ? taskIndex[activeTaskId] : undefined;
+  const formattedCost = formatCostUsd(totalCostUsd);
 
   return (
     <header className="flex items-center justify-between px-4 py-1.5 border-b border-separator/50 h-10">
@@ -25,6 +33,15 @@ export function TopBar({ onToggleTerminal, onToggleSidePanel, hasUnviewedDiff }:
           <h1 className="text-sm text-foreground font-medium truncate">{activeEntry.title}</h1>
         ) : (
           <span className="text-sm text-muted truncate">Shipyard</span>
+        )}
+        {formattedCost && (
+          <span
+            role="status"
+            aria-label={`Task cost: ${formattedCost}`}
+            className="hidden sm:inline text-xs text-muted font-mono shrink-0"
+          >
+            <span aria-hidden="true">&middot;</span> {formattedCost}
+          </span>
         )}
       </div>
 
