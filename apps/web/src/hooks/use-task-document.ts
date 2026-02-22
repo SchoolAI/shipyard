@@ -23,6 +23,7 @@ import {
   TaskMetaDocumentSchema,
   TaskReviewDocumentSchema,
   type TaskReviewDocumentShape,
+  type TodoItem,
 } from '@shipyard/loro-schema';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRepo } from '../providers/repo-provider';
@@ -86,6 +87,7 @@ export interface TaskDocumentResult {
   }) => string;
   resolvePlanComment: (commentId: string) => void;
   deletePlanComment: (commentId: string) => void;
+  todoItems: TodoItem[];
   deliveredCommentIds: string[];
   markCommentsDelivered: (commentIds: string[]) => void;
   isLoading: boolean;
@@ -144,6 +146,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   );
   const sessions = useDoc(convHandle, (d: { sessions: SessionEntry[] }) => d.sessions);
   const plans = useDoc(reviewHandle, (d: { plans: PlanVersion[] }) => d.plans);
+  const todoItems = useDoc(reviewHandle, (d: { todoItems: TodoItem[] }) => d.todoItems);
   const diffState = useDoc(convHandle, (d: { diffState: DiffState }) => d.diffState);
 
   const diffCommentsRecord = useDoc(
@@ -384,6 +387,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       addPlanComment: () => '',
       resolvePlanComment: () => {},
       deletePlanComment: () => {},
+      todoItems: [],
       deliveredCommentIds: [],
       markCommentsDelivered: () => {},
       isLoading: false,
@@ -408,6 +412,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     addPlanComment,
     resolvePlanComment,
     deletePlanComment,
+    todoItems: todoItems ?? [],
     deliveredCommentIds,
     markCommentsDelivered,
     isLoading: !meta,

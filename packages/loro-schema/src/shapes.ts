@@ -145,6 +145,16 @@ export const SessionEntryShape = Shape.plain.struct({
   error: Shape.plain.string().nullable(),
 });
 
+const TODO_ITEM_STATUSES = ['pending', 'in_progress', 'completed'] as const;
+
+export const TodoItemShape = Shape.plain.struct({
+  content: Shape.plain.string(),
+  status: Shape.plain.string(...TODO_ITEM_STATUSES),
+  activeForm: Shape.plain.string(),
+  startedAt: Shape.plain.number().nullable(),
+  completedAt: Shape.plain.number().nullable(),
+});
+
 const PLAN_REVIEW_STATUSES = ['pending', 'approved', 'changes-requested'] as const;
 
 /**
@@ -234,6 +244,7 @@ export const TaskReviewDocumentSchema = Shape.doc({
   diffComments: Shape.record(DiffCommentShape),
   planComments: Shape.record(PlanCommentShape),
   deliveredCommentIds: Shape.list(Shape.plain.string()),
+  todoItems: Shape.list(TodoItemShape),
 });
 
 export type EpochDocumentShape = typeof EpochDocumentSchema;
@@ -280,6 +291,8 @@ export type PlanComment = Infer<typeof PlanCommentShape>;
 export type CommentAuthorType = (typeof COMMENT_AUTHOR_TYPES)[number];
 export type DiffCommentSide = (typeof DIFF_COMMENT_SIDES)[number];
 export type DiffCommentScope = (typeof DIFF_COMMENT_SCOPES)[number];
+export type TodoItem = Infer<typeof TodoItemShape>;
+export type TodoItemStatus = (typeof TODO_ITEM_STATUSES)[number];
 export type ImageSourceType = (typeof IMAGE_SOURCE_TYPES)[number];
 export type ImageSource = Infer<typeof ImageSourceShape>;
 export type SupportedImageMediaType = (typeof SUPPORTED_IMAGE_MEDIA_TYPES)[number];
@@ -298,6 +311,7 @@ export {
   PLAN_REVIEW_STATUSES,
   REASONING_EFFORTS,
   SESSION_STATES,
+  TODO_ITEM_STATUSES,
 };
 
 const TOOL_RISK_LEVELS = ['low', 'medium', 'high'] as const;

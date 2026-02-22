@@ -65,6 +65,12 @@ function summarizeAskUserQuestion(input: Record<string, unknown>): string {
   return 'Asking question';
 }
 
+function summarizeTodoWrite(input: Record<string, unknown>): string {
+  const todos = Array.isArray(input.todos) ? input.todos : [];
+  const completed = todos.filter((t) => isRecord(t) && t.status === 'completed').length;
+  return `Updated tasks ${completed}/${todos.length}`;
+}
+
 export const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) => string> = {
   Bash: summarizeBash,
   Edit: summarizeEdit,
@@ -73,6 +79,7 @@ export const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) =
   Glob: summarizeGlob,
   Grep: summarizeGrep,
   AskUserQuestion: summarizeAskUserQuestion,
+  TodoWrite: summarizeTodoWrite,
 };
 
 /**
@@ -115,4 +122,5 @@ export const TOOL_ICON_LABELS: Record<string, string> = {
   Task: 'Subagent',
   ExitPlanMode: 'Plan',
   AskUserQuestion: 'Question',
+  TodoWrite: 'Tasks',
 };
