@@ -79,12 +79,14 @@ function FocusHierarchyProvider({ children }: { children: ReactNode }) {
   const pendingRafRef = useRef<number>(0);
   const isOverlayOpenRef = useRef(isOverlayOpen);
   isOverlayOpenRef.current = isOverlayOpen;
+  const scheduledTargetRef = useRef<{ id: string; priority: number } | null>(null);
 
   const clearPending = useCallback(() => {
     clearTimeout(pendingTimerRef.current);
     pendingTimerRef.current = undefined;
     cancelAnimationFrame(pendingRafRef.current);
     pendingRafRef.current = 0;
+    scheduledTargetRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -96,6 +98,24 @@ function FocusHierarchyProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    /**
+     * When a scheduleFocus timer is pending, only override it if a
+     * higher-priority target has appeared. This prevents version bumps
+     * from focus target mount/unmount cycles during re-renders from
+     * canceling the delayed focus (e.g. J/K navigation delay).
+     */
+    const scheduled = scheduledTargetRef.current;
+    if (scheduled) {
+      if (winner.priority > scheduled.priority) {
+        clearPending();
+        pendingRafRef.current = requestAnimationFrame(() => {
+          winner.ref.current?.focus();
+          setActiveTargetId(winner.id);
+        });
+      }
+      return;
+    }
+
     clearPending();
 
     pendingRafRef.current = requestAnimationFrame(() => {
@@ -104,9 +124,19 @@ function FocusHierarchyProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      clearPending();
+      /**
+       * Only cancel the rAF this effect iteration created — NOT the
+       * scheduleFocus timer. clearPending() would wipe a pending
+       * scheduleFocus, defeating the protection above.
+       */
+      cancelAnimationFrame(pendingRafRef.current);
+      pendingRafRef.current = 0;
     };
   }, [version, isOverlayOpen, clearPending]);
+
+  useEffect(() => {
+    return () => clearPending();
+  }, [clearPending]);
 
   const register = useCallback((opts: FocusTargetOptions) => {
     targetsRef.current.set(opts.id, opts);
@@ -141,17 +171,26 @@ function FocusHierarchyProvider({ children }: { children: ReactNode }) {
     (id: string, delay: number) => {
       clearPending();
 
+      const target = targetsRef.current.get(id);
+      scheduledTargetRef.current = { id, priority: target?.priority ?? 0 };
+
       pendingTimerRef.current = setTimeout(() => {
         pendingTimerRef.current = undefined;
-        if (isOverlayOpenRef.current) return;
+        if (isOverlayOpenRef.current) {
+          scheduledTargetRef.current = null;
+          return;
+        }
 
         const winner = findWinner(targetsRef.current);
         const requested = targetsRef.current.get(id);
         if (requested && winner && winner.id === id) {
           pendingRafRef.current = requestAnimationFrame(() => {
+            scheduledTargetRef.current = null;
             requested.ref.current?.focus();
             setActiveTargetId(id);
           });
+        } else {
+          scheduledTargetRef.current = null;
         }
       }, delay);
     },

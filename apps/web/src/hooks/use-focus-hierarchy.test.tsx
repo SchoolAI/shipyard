@@ -248,6 +248,75 @@ describe('useFocusHierarchy', () => {
     expect(ref.current?.focus).not.toHaveBeenCalled();
   });
 
+  it('version bump from same-priority target does not cancel scheduleFocus', () => {
+    const composerRef = createMockRef();
+    const permRef = createMockRef();
+
+    const { result, rerender } = renderHook(
+      ({ permissionActive }: { permissionActive: boolean }) => {
+        useFocusTarget({
+          id: 'composer',
+          ref: composerRef,
+          priority: FOCUS_PRIORITY.COMPOSER,
+        });
+        useFocusTarget({
+          id: 'permission',
+          ref: permRef,
+          priority: FOCUS_PRIORITY.PERMISSION,
+          active: permissionActive,
+        });
+        return useFocusHierarchy();
+      },
+      { wrapper: Wrapper, initialProps: { permissionActive: true } }
+    );
+
+    composerRef.current?.focus.mockClear();
+    permRef.current?.focus.mockClear();
+
+    act(() => result.current.scheduleFocus('composer', 1000));
+
+    // Permission card deactivates during the delay (same priority landscape
+    // change but winner is still the scheduled target — should NOT cancel)
+    rerender({ permissionActive: false });
+
+    // Focus should NOT have fired yet
+    expect(composerRef.current?.focus).not.toHaveBeenCalled();
+
+    // After the full delay, the scheduled focus fires
+    act(() => vi.advanceTimersByTime(1000));
+
+    expect(composerRef.current?.focus).toHaveBeenCalledOnce();
+  });
+
+  it('rapid scheduleFocus calls: only the last one fires', () => {
+    const composerRef = createMockRef();
+
+    const { result } = renderHook(
+      () => {
+        useFocusTarget({
+          id: 'composer',
+          ref: composerRef,
+          priority: FOCUS_PRIORITY.COMPOSER,
+        });
+        return useFocusHierarchy();
+      },
+      { wrapper: Wrapper }
+    );
+
+    composerRef.current?.focus.mockClear();
+
+    act(() => result.current.scheduleFocus('composer', 1000));
+    act(() => vi.advanceTimersByTime(500));
+    act(() => result.current.scheduleFocus('composer', 1000));
+    act(() => vi.advanceTimersByTime(500));
+
+    expect(composerRef.current?.focus).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(500));
+
+    expect(composerRef.current?.focus).toHaveBeenCalledOnce();
+  });
+
   it('first registered target wins at same priority', () => {
     const ref1 = createMockRef();
     const ref2 = createMockRef();
