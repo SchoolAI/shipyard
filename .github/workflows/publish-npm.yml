@@ -145,7 +145,7 @@ jobs:
         run: |
           BASE_VERSION=$(node -p "require('./apps/daemon/package-npm.json').version")
           DATE_STAMP=$(date -u +%Y%m%d)
-          PREFIX="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}."
+          export PREFIX="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}."
 
           # Verify registry is reachable before querying versions
           if ! npm view @schoolai/shipyard --json > /dev/null 2>&1; then
@@ -170,6 +170,14 @@ jobs:
           ")
 
           VERSION="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}.${COUNTER}"
+
+          # Safety net: if npm CDN cache is stale, increment until we find a free version
+          while npm view "@schoolai/shipyard@${VERSION}" version > /dev/null 2>&1; do
+            echo "::warning::Version ${VERSION} already exists on npm (stale CDN cache?), incrementing counter"
+            COUNTER=$((COUNTER + 1))
+            VERSION="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}.${COUNTER}"
+          done
+
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Computed version: ${VERSION} (counter: ${COUNTER})"
@@ -183,26 +191,13 @@ jobs:
           cp package-npm.json package.json
           npm version "${VERSION}" --no-git-tag-version --allow-same-version
 
-      - name: Check if version already published (nightly/RC)
-        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
-        id: check_published
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          if npm view "@schoolai/shipyard@${VERSION}" version > /dev/null 2>&1; then
-            echo "::notice::Version ${VERSION} already exists on npm, skipping publish"
-            echo "already_published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "already_published=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Publish to npm (nightly/RC)
-        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true' && steps.check_published.outputs.already_published != 'true'
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
         working-directory: apps/daemon
         run: npm publish --tag next --provenance --access public
 
       - name: Git tag (nightly/RC)
-        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true' && steps.check_published.outputs.already_published != 'true'
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
@@ -212,7 +207,7 @@ jobs:
           git push origin "${TAG}"
 
       - name: GitHub pre-release (nightly/RC)
-        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true' && steps.check_published.outputs.already_published != 'true'
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
