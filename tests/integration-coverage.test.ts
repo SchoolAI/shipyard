@@ -63,7 +63,7 @@ const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
   {
     sourceDir: 'packages/loro-schema/src',
     testSuffix: '.test.ts',
-    sourcePattern: /^(shapes|ids|epoch)\.ts$/,
+    sourcePattern: /^(shapes|ids|epoch|permissions)\.ts$/,
     description: 'Loro Schema High Fan-In Models',
   },
   {

@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { change, type TypedDoc } from '@loro-extended/change';
 import { Repo } from '@loro-extended/repo';
 import {
+  buildShipyardPermissions,
   buildTaskConvDocId,
   buildTaskMetaDocId,
   buildTaskReviewDocId,
@@ -119,8 +120,9 @@ async function setupRepo(dataDir: string) {
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
   const storage = new FileStorageAdapter(dataDir);
   const repo = new Repo({
-    identity: { name: 'shipyard-daemon' },
+    identity: { name: 'shipyard-daemon', type: 'service' },
     adapters: [storage],
+    permissions: buildShipyardPermissions('owner'),
   });
   return repo;
 }
