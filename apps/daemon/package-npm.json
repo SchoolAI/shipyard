@@ -15,8 +15,8 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.39",
-    "loro-crdt": "^1.10.3",
+    "@anthropic-ai/claude-agent-sdk": "0.2.50",
+    "loro-crdt": "~1.10.3",
     "node-datachannel": "^0.32.1",
     "node-pty": "^1.0.0",
     "pino": "^9.6.0",
